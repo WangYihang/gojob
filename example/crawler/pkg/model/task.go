@@ -3,6 +3,7 @@ package model
 import (
 	"net/http"
 	"net/url"
+	"time"
 )
 
 type Task struct {
@@ -28,6 +29,12 @@ func (t *Task) String() string {
 
 func (t *Task) Run() (result *Result) {
 	var err error
+
+	t.StartedAt = time.Now().UnixMilli()
+	defer func() {
+		t.FinishedAt = time.Now().UnixMilli()
+	}()
+
 	result = &Result{
 		Task:  t,
 		HTTP:  &HTTP{},
