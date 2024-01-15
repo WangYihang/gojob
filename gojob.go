@@ -1,4 +1,4 @@
-package pipekit
+package gojob
 
 import (
 	"bufio"

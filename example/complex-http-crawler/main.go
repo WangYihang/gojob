@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	pipekit "github.com/WangYihang/GoJob"
+	gojob "github.com/WangYihang/GoJob"
 	"github.com/WangYihang/GoJob/example/complex-http-crawler/pkg/model"
 	"github.com/jessevdk/go-flags"
 )
@@ -24,8 +24,8 @@ func init() {
 }
 
 func main() {
-	scheduler := pipekit.NewScheduler(opts.NumWorkers, opts.OutputFilePath)
-	for line := range pipekit.Cat(opts.InputFilePath) {
+	scheduler := gojob.NewScheduler(opts.NumWorkers, opts.OutputFilePath)
+	for line := range gojob.Cat(opts.InputFilePath) {
 		scheduler.Add(model.NewTask(line))
 	}
 	scheduler.Start()

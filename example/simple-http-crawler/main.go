@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	pipekit "github.com/WangYihang/GoJob"
+	gojob "github.com/WangYihang/GoJob"
 )
 
 type MyTask struct {
@@ -47,8 +47,8 @@ func (t *MyTask) Bytes() ([]byte, error) {
 }
 
 func main() {
-	scheduler := pipekit.NewScheduler(16, "output.txt")
-	for line := range pipekit.Cat("input.txt") {
+	scheduler := gojob.NewScheduler(16, "output.txt")
+	for line := range gojob.Cat("input.txt") {
 		scheduler.Add(NewTask(line))
 	}
 	scheduler.Start()
