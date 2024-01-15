@@ -1,11 +1,11 @@
-# GoJob
+# go(od)job
 
-GoJob is a simple job scheduler.
+gojob is a simple job scheduler.
 
 ## Install
 
 ```
-go get github.com/WangYihang/GoJob
+go get github.com/WangYihang/gojob
 ```
 
 ## Usage
@@ -31,7 +31,7 @@ import (
 	"net/http"
 	"time"
 
-	gojob "github.com/WangYihang/GoJob"
+	"github.com/WangYihang/gojob"
 )
 
 type MyTask struct {
@@ -84,7 +84,7 @@ func main() {
 
 ### http-crawler
 
-Let's say you have a bunch of URLs that you want to crawl and save the HTTP response to a file. You can use GoJob to do that.
+Let's say you have a bunch of URLs that you want to crawl and save the HTTP response to a file. You can use gojob to do that.
 Check [it](./example/complex-http-crawler/) out for details.
 
 ```

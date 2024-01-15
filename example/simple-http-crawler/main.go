@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	gojob "github.com/WangYihang/GoJob"
+	"github.com/WangYihang/gojob"
 )
 
 type MyTask struct {

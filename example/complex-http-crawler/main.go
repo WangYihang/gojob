@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	gojob "github.com/WangYihang/GoJob"
-	"github.com/WangYihang/GoJob/example/complex-http-crawler/pkg/model"
+	"github.com/WangYihang/gojob"
+	"github.com/WangYihang/gojob/example/complex-http-crawler/pkg/model"
 	"github.com/jessevdk/go-flags"
 )
 
