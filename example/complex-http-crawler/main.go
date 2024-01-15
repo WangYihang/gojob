@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	pipekit "github.com/WangYihang/gojob"
-	"github.com/WangYihang/gojob/example/complex-http-crawler/pkg/model"
+	pipekit "github.com/WangYihang/GoJob"
+	"github.com/WangYihang/GoJob/example/complex-http-crawler/pkg/model"
 	"github.com/jessevdk/go-flags"
 )
 

@@ -1,4 +1,4 @@
-module github.com/WangYihang/gojob
+module github.com/WangYihang/GoJob
 
 go 1.21.0
 

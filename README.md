@@ -5,7 +5,7 @@ GoJob is a simple job scheduler.
 ## Install
 
 ```
-go get github.com/WangYihang/gojob
+go get github.com/WangYihang/GoJob
 ```
 
 ## Usage
@@ -45,7 +45,7 @@ import (
 	"net/http"
 	"time"
 
-	pipekit "github.com/WangYihang/gojob"
+	pipekit "github.com/WangYihang/GoJob"
 )
 
 type MyTask struct {

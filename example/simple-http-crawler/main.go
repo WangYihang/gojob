@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	pipekit "github.com/WangYihang/gojob"
+	pipekit "github.com/WangYihang/GoJob"
 )
 
 type MyTask struct {
