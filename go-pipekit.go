@@ -92,6 +92,7 @@ func Cat(path string) chan []byte {
 			slog.Error("error occured while opening file", slog.String("path", path), slog.String("error", err.Error()))
 			return
 		}
+		defer fd.Close()
 		scanner := bufio.NewScanner(fd)
 		for scanner.Scan() {
 			out <- bytes.TrimSpace(scanner.Bytes())
@@ -133,4 +134,90 @@ func Reduce[T interface{}](in chan T, f func(T, T) T) T {
 		result = f(result, line)
 	}
 	return result
+}
+
+// Task is an interface that defines a task
+type Task interface {
+	Unserialize(line []byte) (err error)
+	Start()
+	Serialize() ([]byte, error)
+}
+
+// Scheduler is a task scheduler
+type Scheduler struct {
+	NumWorkers     int
+	OutputFilePath string
+	TaskWaitGroup  sync.WaitGroup
+	LogWaitGroup   sync.WaitGroup
+	TaskChan       chan Task
+	StopChan       chan struct{}
+	LogChan        chan string
+}
+
+// NewScheduler creates a new scheduler
+func NewScheduler(numWorkers int, outputFilePath string) *Scheduler {
+	s := &Scheduler{
+		NumWorkers:    numWorkers,
+		TaskWaitGroup: sync.WaitGroup{},
+		LogWaitGroup:  sync.WaitGroup{},
+		TaskChan:      make(chan Task, numWorkers),
+		StopChan:      make(chan struct{}),
+		LogChan:       make(chan string),
+	}
+	go s.Logger(outputFilePath)
+	return s
+}
+
+// Add adds a task to the scheduler
+func (s *Scheduler) Add(task Task) {
+	s.TaskWaitGroup.Add(1)
+	s.TaskChan <- task
+}
+
+// Start starts the scheduler
+func (s *Scheduler) Start() {
+	for i := 0; i < s.NumWorkers; i++ {
+		go s.Worker()
+	}
+	s.TaskWaitGroup.Wait()
+	close(s.TaskChan)
+	s.LogWaitGroup.Wait()
+	close(s.LogChan)
+}
+
+// Worker is a worker that executes tasks
+func (s *Scheduler) Worker() {
+	for {
+		select {
+		case task, ok := <-s.TaskChan:
+			if !ok {
+				return
+			}
+			task.Start()
+			data, _ := task.Serialize()
+			s.TaskWaitGroup.Done()
+			s.LogWaitGroup.Add(1)
+			s.LogChan <- string(data)
+		case <-s.StopChan:
+			return
+		}
+	}
+}
+
+func (s *Scheduler) Logger(outputFilePath string) {
+	fd, err := os.OpenFile(outputFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		slog.Error("error occured while opening file", slog.String("path", outputFilePath), slog.String("error", err.Error()))
+		return
+	}
+	defer fd.Close()
+	for line := range s.LogChan {
+		fd.WriteString(line + "\n")
+		s.LogWaitGroup.Done()
+	}
+}
+
+// Stop stops the scheduler
+func (s *Scheduler) Stop() {
+	close(s.StopChan)
 }

@@ -14,28 +14,28 @@ type HTTP struct {
 }
 
 type HTTPRequest struct {
-	Method string `json:"Method"`
-	URL    string `json:"URL"`
-	Host   string `json:"Host"`
+	Method string `json:"method"`
+	URL    string `json:"url"`
+	Host   string `json:"host"`
 
-	RemoteAddr string `json:"RemoteAddr"`
-	RequestURI string `json:"RequestURI"`
+	RemoteAddr string `json:"remote_addr"`
+	RequestURI string `json:"request_uri"`
 
-	Proto      string `json:"Proto"`
-	ProtoMajor int    `json:"ProtoMajor"`
-	ProtoMinor int    `json:"ProtoMinor"`
+	Proto      string `json:"proto"`
+	ProtoMajor int    `json:"proto_major"`
+	ProtoMinor int    `json:"proto_minor"`
 
-	Header http.Header `json:"Header"`
+	Header http.Header `json:"header"`
 
-	ContentLength    int64    `json:"ContentLength"`
-	TransferEncoding []string `json:"TransferEncoding"`
-	Close            bool     `json:"Close"`
+	ContentLength    int64    `json:"content_length"`
+	TransferEncoding []string `json:"transfer_encoding"`
+	Close            bool     `json:"close"`
 
-	Form          url.Values      `json:"Form"`
-	PostForm      url.Values      `json:"PostForm"`
-	MultipartForm *multipart.Form `json:"MultipartForm"`
+	Form          url.Values      `json:"form"`
+	PostForm      url.Values      `json:"post_form"`
+	MultipartForm *multipart.Form `json:"multipart_form"`
 
-	Trailer http.Header `json:"Trailer"`
+	Trailer http.Header `json:"trailer"`
 }
 
 func NewHTTPRequest(req *http.Request) (*HTTPRequest, error) {
@@ -61,22 +61,22 @@ func NewHTTPRequest(req *http.Request) (*HTTPRequest, error) {
 }
 
 type HTTPResponse struct {
-	Status     string `json:"Status"`
-	StatusCode int    `json:"StatusCode"`
+	Status     string `json:"status"`
+	StatusCode int    `json:"status_code"`
 
-	Proto      string `json:"Proto"`
-	ProtoMajor int    `json:"ProtoMajor"`
-	ProtoMinor int    `json:"ProtoMinor"`
+	Proto      string `json:"proto"`
+	ProtoMajor int    `json:"proto_major"`
+	ProtoMinor int    `json:"proto_minor"`
 
-	Header http.Header `json:"Header"`
+	Header http.Header `json:"header"`
 
-	Body []byte `json:"Body"`
+	Body []byte `json:"body"`
 
-	ContentLength    int64       `json:"ContentLength"`
-	TransferEncoding []string    `json:"TransferEncoding"`
-	Close            bool        `json:"Close"`
-	Uncompressed     bool        `json:"Uncompressed"`
-	Trailer          http.Header `json:"Trailer"`
+	ContentLength    int64       `json:"content_length"`
+	TransferEncoding []string    `json:"transfer_encoding"`
+	Close            bool        `json:"close"`
+	Uncompressed     bool        `json:"uncompressed"`
+	Trailer          http.Header `json:"trailer"`
 }
 
 func NewHTTPResponse(resp *http.Response) (*HTTPResponse, error) {
