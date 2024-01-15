@@ -4,20 +4,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"time"
 )
 
 type MyTask struct {
-	Url   string `json:"url"`
-	HTTP  *HTTP  `json:"http"`
-	Error string `json:"error"`
+	Url        string `json:"url"`
+	StartedAt  int64  `json:"started_at"`
+	FinishedAt int64  `json:"finished_at"`
+	HTTP       HTTP   `json:"http"`
+	Error      string `json:"error"`
 }
 
 func NewTask(line []byte) *MyTask {
-	t := &MyTask{
-		Url:   "",
-		HTTP:  &HTTP{},
-		Error: "",
-	}
+	t := &MyTask{}
 	t.Unserialize(line)
 	return t
 }
@@ -28,6 +27,11 @@ func (t *MyTask) Unserialize(line []byte) (err error) {
 }
 
 func (t *MyTask) Start() {
+	t.StartedAt = time.Now().UnixMilli()
+	defer func() {
+		t.FinishedAt = time.Now().UnixMilli()
+	}()
+
 	client := &http.Client{
 		// Disable follow redirection
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
