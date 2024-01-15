@@ -1,5 +1,100 @@
-# Go PipeKit
+# GoJob
+
+GoJob is a simple job scheduler.
+
+## Install
+
+```
+go get github.com/WangYihang/gojob
+```
+
+## Usage
+
+Create a job scheduler with a worker pool of size 32.
+
+```go
+func main() {
+    numWorkers := 32
+    outputFilePath := "output.txt"
+    inputFilePath := "input.txt"
+    scheduler := pipekit.NewScheduler(numWorkers, outputFilePath)
+    for line := range pipekit.Cat(inputFilePath) {
+        scheduler.Add(model.NewTask(line))
+    }
+    scheduler.Start()
+}
+```
+You need to implement the `Task` interface.
+
+```go
+type Task interface {
+	Unserialize(line []byte) (err error)
+	Start()
+	Serialize() ([]byte, error)
+}
+```
 
 ## Use Case
 
-Crawl a bunch of URLs and save the HTTP response to a file (See [http-crawler](./example/http-crawler/)).
+### http-crawler
+
+Let's say you have a bunch of URLs that you want to crawl and save the HTTP response to a file. You can use GoJob to do that.
+Check [it](./example/http-crawler/) out for details.
+
+```
+$ cat urls.txt
+https://www.google.com/
+https://www.facebook.com/
+https://www.youtube.com/
+```
+
+```bash
+$ go run example/http-crawler/main.go --help                         
+Usage:
+  main [OPTIONS]
+
+Application Options:
+  -i, --input=       input file path
+  -o, --output=      output file path
+  -n, --num-workers= number of workers (default: 32)
+
+Help Options:
+  -h, --help         Show this help message
+
+exit status 1
+```
+
+```
+$ go run example/http-crawler/main.go -i input.txt -o output.txt -n 4
+```
+
+```json
+$ tail -n 1 output.txt
+{
+    "url": "https://www.youtube.com/",
+    "http": {
+        "request": {
+            "method": "HEAD",
+            "url": "https://www.youtube.com/",
+            "host": "www.youtube.com",
+            "proto": "HTTP/1.1"
+        },
+        "response": {
+            "status": "200 OK",
+            "status_code": 200,
+            "proto": "HTTP/2.0",
+            "proto_major": 2,
+            "proto_minor": 0,
+            "header": {
+                "Server": [
+                    "ESF"
+                ]
+            },
+            // details omitted for simplicity
+            "body": "",
+            "content_length": 783869
+        }
+    },
+    "error": ""
+}
+```

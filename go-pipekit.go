@@ -138,8 +138,14 @@ func Reduce[T interface{}](in chan T, f func(T, T) T) T {
 
 // Task is an interface that defines a task
 type Task interface {
+	// Unserialize unserializes a task from a byte array, returns an error if the task is invalid
+	// For example, a task can be unserialized from a line of a file
 	Unserialize(line []byte) (err error)
+	// Start starts the task
 	Start()
+	// Serialize serializes a task to a byte array, returns an error if the task is invalid
+	// For example, a task can be serialized to a line of a file
+	// You can store the result of a task in the task itself, when the task is serialized, the bytes of the result will be written to the log file
 	Serialize() ([]byte, error)
 }
 
