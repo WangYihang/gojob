@@ -14,7 +14,7 @@ Create a job scheduler with a worker pool of size 32. To do this, you need to im
 
 ```go
 type Task interface {
-	Parse(line []byte) (err error)
+	Parse(data []byte) (err error)
 	Start()
 	Bytes() ([]byte, error)
 }
@@ -48,7 +48,7 @@ func NewTask(line []byte) *MyTask {
 	return t
 }
 
-func (t *MyTask) Parse(line []byte) (err error) {
+func (t *MyTask) Parse(data []byte) (err error) {
 	t.Url = string(bytes.TrimSpace(line))
 	return
 }

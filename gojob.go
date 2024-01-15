@@ -140,7 +140,7 @@ func Reduce[T interface{}](in chan T, f func(T, T) T) T {
 type Task interface {
 	// Parse unserializes a task from a byte array, returns an error if the task is invalid
 	// For example, a task can be unserialized from a line of a file
-	Parse(line []byte) (err error)
+	Parse(data []byte) (err error)
 	// Start starts the task
 	Start()
 	// Bytes serializes a task to a byte array, returns an error if the task is invalid

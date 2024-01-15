@@ -21,8 +21,8 @@ func NewTask(line []byte) *MyTask {
 	return t
 }
 
-func (t *MyTask) Parse(line []byte) (err error) {
-	t.Url = string(bytes.TrimSpace(line))
+func (t *MyTask) Parse(data []byte) (err error) {
+	t.Url = string(bytes.TrimSpace(data))
 	return
 }
 
