@@ -26,7 +26,7 @@ func (t *MyTask) Parse(data []byte) (err error) {
 	return
 }
 
-func (t *MyTask) Start() {
+func (t *MyTask) Do() {
 	t.StartedAt = time.Now().UnixMilli()
 	defer func() {
 		t.FinishedAt = time.Now().UnixMilli()

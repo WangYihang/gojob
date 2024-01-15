@@ -141,8 +141,8 @@ type Task interface {
 	// Parse unserializes a task from a byte array, returns an error if the task is invalid
 	// For example, a task can be unserialized from a line of a file
 	Parse(data []byte) (err error)
-	// Start starts the task
-	Start()
+	// Do starts the task
+	Do()
 	// Bytes serializes a task to a byte array, returns an error if the task is invalid
 	// For example, a task can be serialized to a line of a file
 	// You can store the result of a task in the task itself, when the task is serialized, the bytes of the result will be written to the log file
@@ -153,77 +153,61 @@ type Task interface {
 type Scheduler struct {
 	NumWorkers     int
 	OutputFilePath string
-	TaskWaitGroup  sync.WaitGroup
-	LogWaitGroup   sync.WaitGroup
 	TaskChan       chan Task
-	StopChan       chan struct{}
-	LogChan        chan string
 }
 
 // NewScheduler creates a new scheduler
 func NewScheduler(numWorkers int, outputFilePath string) *Scheduler {
-	s := &Scheduler{
-		NumWorkers:    numWorkers,
-		TaskWaitGroup: sync.WaitGroup{},
-		LogWaitGroup:  sync.WaitGroup{},
-		TaskChan:      make(chan Task, numWorkers),
-		StopChan:      make(chan struct{}),
-		LogChan:       make(chan string),
+	return &Scheduler{
+		NumWorkers:     numWorkers,
+		TaskChan:       make(chan Task, numWorkers),
+		OutputFilePath: outputFilePath,
 	}
-	go s.Logger(outputFilePath)
-	return s
 }
 
 // Add adds a task to the scheduler
 func (s *Scheduler) Add(task Task) {
-	s.TaskWaitGroup.Add(1)
 	s.TaskChan <- task
 }
 
 // Start starts the scheduler
 func (s *Scheduler) Start() {
+	results := []chan string{}
 	for i := 0; i < s.NumWorkers; i++ {
-		go s.Worker()
+		results = append(results, s.Worker())
 	}
-	s.TaskWaitGroup.Wait()
-	close(s.TaskChan)
-	s.LogWaitGroup.Wait()
-	close(s.LogChan)
+	s.Writer(Fanin(results), s.OutputFilePath)
 }
 
-// Worker is a worker that executes tasks
-func (s *Scheduler) Worker() {
-	for {
-		select {
-		case task, ok := <-s.TaskChan:
-			if !ok {
-				return
+func (s *Scheduler) Worker() chan string {
+	out := make(chan string)
+	go func() {
+		defer close(out)
+		for task := range s.TaskChan {
+			task.Do()
+			data, err := task.Bytes()
+			if err != nil {
+				slog.Error("error occured while serializing task", slog.String("error", err.Error()))
 			}
-			task.Start()
-			data, _ := task.Bytes()
-			s.TaskWaitGroup.Done()
-			s.LogWaitGroup.Add(1)
-			s.LogChan <- string(data)
-		case <-s.StopChan:
+			out <- string(data)
+		}
+	}()
+	return out
+}
+
+func (s *Scheduler) Writer(lines chan string, outputFilePath string) {
+	var fd *os.File
+	var err error
+	if outputFilePath == "-" {
+		fd = os.Stdout
+	} else {
+		fd, err = os.OpenFile(outputFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			slog.Error("error occured while opening file", slog.String("path", outputFilePath), slog.String("error", err.Error()))
 			return
 		}
 	}
-}
-
-func (s *Scheduler) Logger(outputFilePath string) {
-	fd, err := os.OpenFile(outputFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		slog.Error("error occured while opening file", slog.String("path", outputFilePath), slog.String("error", err.Error()))
-		return
+	for result := range lines {
+		fd.WriteString(result + "\n")
 	}
-	defer fd.Close()
-	for line := range s.LogChan {
-		fd.WriteString(line + "\n")
-		s.LogWaitGroup.Done()
-	}
-}
-
-// Stop stops the scheduler
-func (s *Scheduler) Stop() {
-	close(s.StopChan)
 }

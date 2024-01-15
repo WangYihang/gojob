@@ -28,7 +28,7 @@ func (t *MyTask) Parse(data []byte) (err error) {
 	return
 }
 
-func (t *MyTask) Start() {
+func (t *MyTask) Do() {
 	t.StartedAt = time.Now().UnixMilli()
 	defer func() {
 		t.FinishedAt = time.Now().UnixMilli()
@@ -48,8 +48,10 @@ func (t *MyTask) Bytes() ([]byte, error) {
 
 func main() {
 	scheduler := gojob.NewScheduler(16, "output.txt")
-	for line := range gojob.Cat("input.txt") {
-		scheduler.Add(NewTask(line))
-	}
+	go func() {
+		for line := range gojob.Cat("input.txt") {
+			scheduler.Add(NewTask(line))
+		}
+	}()
 	scheduler.Start()
 }
