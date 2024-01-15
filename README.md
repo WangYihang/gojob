@@ -34,12 +34,72 @@ type Task interface {
 }
 ```
 
+The whole [code](./example/simple-http-crawler/) looks like this.
+
+```go
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"time"
+
+	pipekit "github.com/WangYihang/gojob"
+)
+
+type MyTask struct {
+	Url        string `json:"url"`
+	StartedAt  int64  `json:"started_at"`
+	FinishedAt int64  `json:"finished_at"`
+	StatusCode int    `json:"status_code"`
+	Error      string `json:"error"`
+}
+
+func NewTask(line []byte) *MyTask {
+	t := &MyTask{}
+	t.Unserialize(line)
+	return t
+}
+
+func (t *MyTask) Unserialize(line []byte) (err error) {
+	t.Url = string(bytes.TrimSpace(line))
+	return
+}
+
+func (t *MyTask) Start() {
+	t.StartedAt = time.Now().UnixMilli()
+	defer func() {
+		t.FinishedAt = time.Now().UnixMilli()
+	}()
+	response, err := http.Get(t.Url)
+	if err != nil {
+		t.Error = err.Error()
+		return
+	}
+	t.StatusCode = response.StatusCode
+	defer response.Body.Close()
+}
+
+func (t *MyTask) Serialize() ([]byte, error) {
+	return json.Marshal(t)
+}
+
+func main() {
+	scheduler := pipekit.NewScheduler(16, "output.txt")
+	for line := range pipekit.Cat("input.txt") {
+		scheduler.Add(NewTask(line))
+	}
+	scheduler.Start()
+}
+```
+
 ## Use Case
 
 ### http-crawler
 
 Let's say you have a bunch of URLs that you want to crawl and save the HTTP response to a file. You can use GoJob to do that.
-Check [it](./example/http-crawler/) out for details.
+Check [it](./example/complex-http-crawler/) out for details.
 
 ```
 $ cat urls.txt
@@ -49,7 +109,7 @@ https://www.youtube.com/
 ```
 
 ```bash
-$ go run example/http-crawler/main.go --help                         
+$ go run example/complex-http-crawler/main.go --help                         
 Usage:
   main [OPTIONS]
 
@@ -65,7 +125,7 @@ exit status 1
 ```
 
 ```
-$ go run example/http-crawler/main.go -i input.txt -o output.txt -n 4
+$ go run example/complex-http-crawler/main.go -i input.txt -o output.txt -n 4
 ```
 
 ```json
