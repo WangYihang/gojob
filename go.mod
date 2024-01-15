@@ -1,4 +1,4 @@
-module github.com/WangYihang/go-pipekit
+module github.com/WangYihang/gojob
 
 go 1.21.0
 
