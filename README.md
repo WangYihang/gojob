@@ -10,21 +10,7 @@ go get github.com/WangYihang/GoJob
 
 ## Usage
 
-Create a job scheduler with a worker pool of size 32.
-
-```go
-func main() {
-    numWorkers := 32
-    outputFilePath := "output.txt"
-    inputFilePath := "input.txt"
-    scheduler := pipekit.NewScheduler(numWorkers, outputFilePath)
-    for line := range pipekit.Cat(inputFilePath) {
-        scheduler.Add(model.NewTask(line))
-    }
-    scheduler.Start()
-}
-```
-You need to implement the `Task` interface.
+Create a job scheduler with a worker pool of size 32. To do this, you need to implement the `Task` interface.
 
 ```go
 type Task interface {
