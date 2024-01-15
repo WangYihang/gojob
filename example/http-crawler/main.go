@@ -24,8 +24,8 @@ func init() {
 }
 
 func main() {
-	scheduler := pipekit.NewScheduler(32, "output.txt")
-	for line := range pipekit.Cat("input.txt") {
+	scheduler := pipekit.NewScheduler(opts.NumWorkers, opts.OutputFilePath)
+	for line := range pipekit.Cat(opts.InputFilePath) {
 		scheduler.Add(model.NewTask(line))
 	}
 	scheduler.Start()
