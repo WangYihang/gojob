@@ -198,7 +198,6 @@ func (s *Scheduler) Start() {
 
 func (s *Scheduler) Wait() {
 	s.WaitGroup.Wait()
-	close(s.WriterChan)
 }
 
 func (s *Scheduler) Worker() chan string {
