@@ -161,26 +161,27 @@ type Task interface {
 
 // Scheduler is a task scheduler
 type Scheduler struct {
-	NumWorkers     int
-	OutputFilePath string
-	TaskChan       chan Task
-	WaitGroup      *sync.WaitGroup
-	WriterChan     chan string
+	NumWorkers      int
+	OutputFilePath  string
+	TaskChan        chan Task
+	TaskWaitGroup   *sync.WaitGroup
+	WriterWaitGroup *sync.WaitGroup
 }
 
 // NewScheduler creates a new scheduler
 func NewScheduler(numWorkers int, outputFilePath string) *Scheduler {
 	return &Scheduler{
-		NumWorkers:     numWorkers,
-		TaskChan:       make(chan Task, numWorkers),
-		OutputFilePath: outputFilePath,
-		WaitGroup:      &sync.WaitGroup{},
+		NumWorkers:      numWorkers,
+		TaskChan:        make(chan Task, numWorkers),
+		OutputFilePath:  outputFilePath,
+		TaskWaitGroup:   &sync.WaitGroup{},
+		WriterWaitGroup: &sync.WaitGroup{},
 	}
 }
 
 // Submit submits a task to the scheduler
 func (s *Scheduler) Submit(task Task) {
-	s.WaitGroup.Add(1)
+	s.TaskWaitGroup.Add(1)
 	go func() {
 		s.TaskChan <- task
 	}()
@@ -192,12 +193,12 @@ func (s *Scheduler) Start() {
 	for i := 0; i < s.NumWorkers; i++ {
 		results = append(results, s.Worker())
 	}
-	s.WriterChan = Fanin(results)
-	go s.Writer(s.OutputFilePath)
+	go s.Writer(Fanin(results), s.OutputFilePath)
 }
 
 func (s *Scheduler) Wait() {
-	s.WaitGroup.Wait()
+	s.TaskWaitGroup.Wait()
+	s.WriterWaitGroup.Wait()
 }
 
 func (s *Scheduler) Worker() chan string {
@@ -213,14 +214,15 @@ func (s *Scheduler) Worker() chan string {
 			if err != nil {
 				slog.Error("error occured while serializing task", slog.String("error", err.Error()))
 			}
+			s.WriterWaitGroup.Add(1)
 			out <- string(data)
-			s.WaitGroup.Done()
+			s.TaskWaitGroup.Done()
 		}
 	}()
 	return out
 }
 
-func (s *Scheduler) Writer(outputFilePath string) {
+func (s *Scheduler) Writer(inputChan chan string, outputFilePath string) {
 	var fd *os.File
 	var err error
 	if outputFilePath == "-" {
@@ -242,7 +244,8 @@ func (s *Scheduler) Writer(outputFilePath string) {
 			return
 		}
 	}
-	for result := range s.WriterChan {
+	for result := range inputChan {
 		fd.WriteString(result + "\n")
+		s.WriterWaitGroup.Done()
 	}
 }

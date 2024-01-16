@@ -46,7 +46,7 @@ func (t *MyTask) Bytes() ([]byte, error) {
 }
 
 func (t *MyTask) NeedRetry() bool {
-	return t.NumTries <= MAX_TRIES
+	return t.NumTries < MAX_TRIES
 }
 
 func main() {
