@@ -8,12 +8,15 @@ import (
 	"github.com/WangYihang/gojob"
 )
 
+var MAX_TRIES = 4
+
 type MyTask struct {
 	Url        string `json:"url"`
 	StartedAt  int64  `json:"started_at"`
 	FinishedAt int64  `json:"finished_at"`
 	StatusCode int    `json:"status_code"`
 	Error      string `json:"error"`
+	NumTries   int    `json:"num_tries"`
 }
 
 func New(url string) *MyTask {
@@ -22,7 +25,8 @@ func New(url string) *MyTask {
 	}
 }
 
-func (t *MyTask) Do() {
+func (t *MyTask) Do() error {
+	t.NumTries++
 	t.StartedAt = time.Now().UnixMilli()
 	defer func() {
 		t.FinishedAt = time.Now().UnixMilli()
@@ -30,22 +34,26 @@ func (t *MyTask) Do() {
 	response, err := http.Get(t.Url)
 	if err != nil {
 		t.Error = err.Error()
-		return
+		return err
 	}
 	t.StatusCode = response.StatusCode
 	defer response.Body.Close()
+	return nil
 }
 
 func (t *MyTask) Bytes() ([]byte, error) {
 	return json.Marshal(t)
 }
 
+func (t *MyTask) NeedRetry() bool {
+	return t.NumTries <= MAX_TRIES
+}
+
 func main() {
 	scheduler := gojob.NewScheduler(16, "output.txt")
-	go func() {
-		for line := range gojob.Cat("input.txt") {
-			scheduler.Add(New(line))
-		}
-	}()
+	for line := range gojob.Cat("input.txt") {
+		scheduler.Submit(New(line))
+	}
 	scheduler.Start()
+	scheduler.Wait()
 }

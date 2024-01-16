@@ -2,7 +2,6 @@ package gojob
 
 import (
 	"bufio"
-	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -94,7 +93,7 @@ func Cat(filePath string) <-chan string {
 		// Open the file
 		file, err := os.Open(filePath)
 		if err != nil {
-			log.Printf("Error opening file: %v", err)
+			slog.Error("error occured while opening file", slog.String("path", filePath), slog.String("error", err.Error()))
 			return // Close the channel and exit the goroutine
 		}
 		defer file.Close()
@@ -106,7 +105,7 @@ func Cat(filePath string) <-chan string {
 
 		// Check for errors during Scan, excluding EOF
 		if err := scanner.Err(); err != nil {
-			log.Printf("Error reading file: %v", err)
+			slog.Error("error occured while reading file", slog.String("path", filePath), slog.String("error", err.Error()))
 		}
 	}()
 
@@ -151,11 +150,13 @@ func Reduce[T interface{}](in chan T, f func(T, T) T) T {
 // Task is an interface that defines a task
 type Task interface {
 	// Do starts the task
-	Do()
+	Do() error
 	// Bytes serializes a task to a byte array, returns an error if the task is invalid
 	// For example, a task can be serialized to a line of a file
 	// You can store the result of a task in the task itself, when the task is serialized, the bytes of the result will be written to the log file
 	Bytes() ([]byte, error)
+	// NeedRetry returns true if the task needs to be retried
+	NeedRetry() bool
 }
 
 // Scheduler is a task scheduler
@@ -163,6 +164,8 @@ type Scheduler struct {
 	NumWorkers     int
 	OutputFilePath string
 	TaskChan       chan Task
+	WaitGroup      *sync.WaitGroup
+	WriterChan     chan string
 }
 
 // NewScheduler creates a new scheduler
@@ -171,12 +174,16 @@ func NewScheduler(numWorkers int, outputFilePath string) *Scheduler {
 		NumWorkers:     numWorkers,
 		TaskChan:       make(chan Task, numWorkers),
 		OutputFilePath: outputFilePath,
+		WaitGroup:      &sync.WaitGroup{},
 	}
 }
 
-// Add adds a task to the scheduler
-func (s *Scheduler) Add(task Task) {
-	s.TaskChan <- task
+// Submit submits a task to the scheduler
+func (s *Scheduler) Submit(task Task) {
+	s.WaitGroup.Add(1)
+	go func() {
+		s.TaskChan <- task
+	}()
 }
 
 // Start starts the scheduler
@@ -185,7 +192,13 @@ func (s *Scheduler) Start() {
 	for i := 0; i < s.NumWorkers; i++ {
 		results = append(results, s.Worker())
 	}
-	s.Writer(Fanin(results), s.OutputFilePath)
+	s.WriterChan = Fanin(results)
+	go s.Writer(s.OutputFilePath)
+}
+
+func (s *Scheduler) Wait() {
+	s.WaitGroup.Wait()
+	close(s.WriterChan)
 }
 
 func (s *Scheduler) Worker() chan string {
@@ -193,18 +206,22 @@ func (s *Scheduler) Worker() chan string {
 	go func() {
 		defer close(out)
 		for task := range s.TaskChan {
-			task.Do()
+			err := task.Do()
+			if err != nil && task.NeedRetry() {
+				s.Submit(task)
+			}
 			data, err := task.Bytes()
 			if err != nil {
 				slog.Error("error occured while serializing task", slog.String("error", err.Error()))
 			}
 			out <- string(data)
+			s.WaitGroup.Done()
 		}
 	}()
 	return out
 }
 
-func (s *Scheduler) Writer(lines chan string, outputFilePath string) {
+func (s *Scheduler) Writer(outputFilePath string) {
 	var fd *os.File
 	var err error
 	if outputFilePath == "-" {
@@ -226,7 +243,7 @@ func (s *Scheduler) Writer(lines chan string, outputFilePath string) {
 			return
 		}
 	}
-	for result := range lines {
+	for result := range s.WriterChan {
 		fd.WriteString(result + "\n")
 	}
 }

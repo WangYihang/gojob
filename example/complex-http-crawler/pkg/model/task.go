@@ -20,7 +20,7 @@ func New(url string) *MyTask {
 	}
 }
 
-func (t *MyTask) Do() {
+func (t *MyTask) Do() error {
 	t.StartedAt = time.Now().UnixMilli()
 	defer func() {
 		t.FinishedAt = time.Now().UnixMilli()
@@ -35,27 +35,32 @@ func (t *MyTask) Do() {
 	req, err := http.NewRequest(http.MethodHead, t.Url, nil)
 	if err != nil {
 		t.Error = err.Error()
-		return
+		return err
 	}
 	httpRequest, err := NewHTTPRequest(req)
 	if err != nil {
 		t.Error = err.Error()
-		return
+		return err
 	}
 	t.HTTP.Request = httpRequest
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Error = err.Error()
-		return
+		return err
 	}
 	httpResponse, err := NewHTTPResponse(resp)
 	if err != nil {
 		t.Error = err.Error()
-		return
+		return err
 	}
 	t.HTTP.Response = httpResponse
+	return nil
 }
 
 func (t *MyTask) Bytes() ([]byte, error) {
 	return json.Marshal(t)
+}
+
+func (t *MyTask) NeedRetry() bool {
+	return false
 }
