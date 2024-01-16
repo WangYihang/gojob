@@ -27,7 +27,7 @@ func main() {
 	scheduler := gojob.NewScheduler(opts.NumWorkers, opts.OutputFilePath)
 	go func() {
 		for line := range gojob.Cat(opts.InputFilePath) {
-			scheduler.Add(model.NewTask(line))
+			scheduler.Add(model.New(string(line)))
 		}
 	}()
 	scheduler.Start()
