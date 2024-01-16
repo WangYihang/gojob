@@ -14,7 +14,6 @@ Create a job scheduler with a worker pool of size 32. To do this, you need to im
 
 ```go
 type Task interface {
-	Parse(data []byte) (err error)
 	Do()
 	Bytes() ([]byte, error)
 }
@@ -26,7 +25,6 @@ The whole [code](./example/simple-http-crawler/) looks like this.
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -42,15 +40,10 @@ type MyTask struct {
 	Error      string `json:"error"`
 }
 
-func NewTask(line []byte) *MyTask {
-	t := &MyTask{}
-	t.Parse(line)
-	return t
-}
-
-func (t *MyTask) Parse(data []byte) (err error) {
-	t.Url = string(bytes.TrimSpace(data))
-	return
+func New(url string) *MyTask {
+	return &MyTask{
+		Url: url,
+	}
 }
 
 func (t *MyTask) Do() {
@@ -75,7 +68,7 @@ func main() {
 	scheduler := gojob.NewScheduler(16, "output.txt")
 	go func() {
 		for line := range gojob.Cat("input.txt") {
-			scheduler.Add(NewTask(line))
+			scheduler.Add(New(string(line)))
 		}
 	}()
 	scheduler.Start()

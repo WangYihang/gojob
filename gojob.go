@@ -5,6 +5,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -82,6 +83,7 @@ func Tail[T interface{}](in chan T, max int) chan T {
 }
 
 // Cat takes a file path and returns a channel with the lines of the file
+// Spaces are trimmed from the beginning and end of each line
 func Cat(filePath string) <-chan string {
 	out := make(chan string)
 
@@ -98,7 +100,7 @@ func Cat(filePath string) <-chan string {
 
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
-			out <- scanner.Text() // Send the line to the channel
+			out <- strings.TrimSpace(scanner.Text()) // Send the line to the channel
 		}
 
 		// Check for errors during Scan, excluding EOF

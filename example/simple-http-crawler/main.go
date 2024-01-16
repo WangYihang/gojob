@@ -44,7 +44,7 @@ func main() {
 	scheduler := gojob.NewScheduler(16, "output.txt")
 	go func() {
 		for line := range gojob.Cat("input.txt") {
-			scheduler.Add(New(string(line)))
+			scheduler.Add(New(line))
 		}
 	}()
 	scheduler.Start()
