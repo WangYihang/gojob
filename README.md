@@ -82,6 +82,12 @@ func main() {
 Let's say you have a bunch of URLs that you want to crawl and save the HTTP response to a file. You can use gojob to do that.
 Check [it](./example/complex-http-crawler/) out for details.
 
+Try it out using the following command.
+
+```
+go install github.com/WangYihang/gojob/example/complex-http-crawler@latest
+```
+
 ```
 $ cat urls.txt
 https://www.google.com/
