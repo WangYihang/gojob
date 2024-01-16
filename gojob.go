@@ -2,7 +2,7 @@ package gojob
 
 import (
 	"bufio"
-	"bytes"
+	"log"
 	"log/slog"
 	"os"
 	"sync"
@@ -82,22 +82,31 @@ func Tail[T interface{}](in chan T, max int) chan T {
 }
 
 // Cat takes a file path and returns a channel with the lines of the file
-// each line is trimmed of whitespace
-func Cat(path string) chan []byte {
-	out := make(chan []byte)
+func Cat(filePath string) <-chan string {
+	out := make(chan string)
+
 	go func() {
-		defer close(out)
-		fd, err := os.Open(path)
+		defer close(out) // Ensure the channel is closed when the goroutine finishes
+
+		// Open the file
+		file, err := os.Open(filePath)
 		if err != nil {
-			slog.Error("error occured while opening file", slog.String("path", path), slog.String("error", err.Error()))
-			return
+			log.Printf("Error opening file: %v", err)
+			return // Close the channel and exit the goroutine
 		}
-		defer fd.Close()
-		scanner := bufio.NewScanner(fd)
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
-			out <- bytes.TrimSpace(scanner.Bytes())
+			out <- scanner.Text() // Send the line to the channel
+		}
+
+		// Check for errors during Scan, excluding EOF
+		if err := scanner.Err(); err != nil {
+			log.Printf("Error reading file: %v", err)
 		}
 	}()
+
 	return out
 }
 
