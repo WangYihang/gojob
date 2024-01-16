@@ -5,6 +5,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -209,6 +210,16 @@ func (s *Scheduler) Writer(lines chan string, outputFilePath string) {
 	if outputFilePath == "-" {
 		fd = os.Stdout
 	} else {
+		// Create folder if not exists
+		dir := filepath.Dir(outputFilePath)
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			err = os.MkdirAll(dir, 0755)
+			if err != nil {
+				slog.Error("error occured while creating folder", slog.String("path", dir), slog.String("error", err.Error()))
+				return
+			}
+		}
+		// Open file
 		fd, err = os.OpenFile(outputFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			slog.Error("error occured while opening file", slog.String("path", outputFilePath), slog.String("error", err.Error()))
