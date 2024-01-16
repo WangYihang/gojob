@@ -194,9 +194,6 @@ func (s *Scheduler) Start() {
 		results = append(results, s.Worker())
 	}
 	go s.Writer(Fanin(results), s.OutputFilePath)
-}
-
-func (s *Scheduler) Wait() {
 	s.TaskWaitGroup.Wait()
 	s.WriterWaitGroup.Wait()
 }

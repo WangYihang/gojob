@@ -29,5 +29,4 @@ func main() {
 		scheduler.Submit(model.New(string(line)))
 	}
 	scheduler.Start()
-	scheduler.Wait()
 }

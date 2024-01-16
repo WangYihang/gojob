@@ -55,5 +55,4 @@ func main() {
 		scheduler.Submit(New(line))
 	}
 	scheduler.Start()
-	scheduler.Wait()
 }
