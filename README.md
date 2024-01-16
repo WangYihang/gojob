@@ -84,19 +84,8 @@ Check [it](./example/complex-http-crawler/) out for details.
 
 Try it out using the following command.
 
-```
-go install github.com/WangYihang/gojob/example/complex-http-crawler@latest
-```
-
-```
-$ cat urls.txt
-https://www.google.com/
-https://www.facebook.com/
-https://www.youtube.com/
-```
-
 ```bash
-$ go run example/complex-http-crawler/main.go --help                         
+$ go run github.com/WangYihang/gojob/example/complex-http-crawler@latest --help                       
 Usage:
   main [OPTIONS]
 
@@ -111,8 +100,15 @@ Help Options:
 exit status 1
 ```
 
+```bash
+$ cat urls.txt
+https://www.google.com/
+https://www.facebook.com/
+https://www.youtube.com/
 ```
-$ go run example/complex-http-crawler/main.go -i input.txt -o output.txt -n 4
+
+```
+$ go run github.com/WangYihang/gojob/example/complex-http-crawler@latest -i input.txt -o output.txt -n 4
 ```
 
 ```json
