@@ -26,3 +26,6 @@ output.txt
 
 # Goreleaser
 dist/
+
+# VSCode
+.vscode/

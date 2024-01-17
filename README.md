@@ -77,15 +77,15 @@ func (t *MyTask) Bytes() ([]byte, error) {
 }
 
 func (t *MyTask) NeedRetry() bool {
-	return t.NumTries <= MAX_TRIES
+	return t.NumTries < MAX_TRIES
 }
 
 func main() {
-	scheduler := gojob.NewScheduler(16, "output.txt")
+	scheduler := gojob.NewScheduler(1, "output.txt")
+	scheduler.Start()
 	for line := range gojob.Cat("input.txt") {
 		scheduler.Submit(New(line))
 	}
-	scheduler.Start()
 	scheduler.Wait()
 }
 ```
