@@ -152,7 +152,7 @@ func Reduce[T interface{}](in chan T, f func(T, T) T) T {
 // Task is an interface that defines a task
 type Task interface {
 	// Do starts the task
-	Do() error
+	Do(ctx context.Context) error
 	// Bytes serializes a task to a byte array, returns an error if the task is invalid
 	// For example, a task can be serialized to a line of a file
 	// You can store the result of a task in the task itself, when the task is serialized, the bytes of the result will be written to the log file
@@ -222,9 +222,10 @@ func (s *Scheduler) Worker() {
 		data, err := task.Bytes()
 		if err != nil {
 			slog.Error("error occured while serializing task", slog.String("error", err.Error()))
+		} else {
+			s.logWg.Add(1)
+			s.LogChan <- string(data)
 		}
-		s.logWg.Add(1)
-		s.LogChan <- string(data)
 		// notify task is done
 		s.taskWg.Done()
 	}
@@ -252,6 +253,7 @@ func (s *Scheduler) Writer() {
 			slog.Error("error occured while opening file", slog.String("path", s.OutputFilePath), slog.String("error", err.Error()))
 			return
 		}
+		defer fd.Close()
 	}
 	for result := range s.LogChan {
 		fd.WriteString(result + "\n")
@@ -259,14 +261,14 @@ func (s *Scheduler) Writer() {
 	}
 }
 
-func RunWithTimeout(f func() error, timeout time.Duration) error {
+func RunWithTimeout(f func(context.Context) error, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	done := make(chan error, 1)
 
 	go func() {
-		done <- f()
+		done <- f(ctx)
 	}()
 
 	select {

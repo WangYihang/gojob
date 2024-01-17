@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -25,20 +26,27 @@ func New(url string) *MyTask {
 	}
 }
 
-func (t *MyTask) Do() error {
+func (t *MyTask) Do(ctx context.Context) error {
 	t.NumTries++
 	t.StartedAt = time.Now().UnixMilli()
 	defer func() {
 		t.FinishedAt = time.Now().UnixMilli()
 	}()
-	response, err := http.Get(t.Url)
-	if err != nil {
-		t.Error = err.Error()
-		return err
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			response, err := http.Get(t.Url)
+			if err != nil {
+				t.Error = err.Error()
+				return err
+			}
+			t.StatusCode = response.StatusCode
+			defer response.Body.Close()
+			return nil
+		}
 	}
-	t.StatusCode = response.StatusCode
-	defer response.Body.Close()
-	return nil
 }
 
 func (t *MyTask) Bytes() ([]byte, error) {
