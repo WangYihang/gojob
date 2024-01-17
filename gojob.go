@@ -206,12 +206,14 @@ func (s *Scheduler) Wait() {
 // Worker is a worker
 func (s *Scheduler) Worker() {
 	for task := range s.TaskChan {
-
 		// do task
 		err := task.Do()
 		// check if retry is needed
 		if err != nil && task.NeedRetry() {
-			go s.Submit(task)
+			s.taskWg.Add(1)
+			go func() {
+				s.TaskChan <- task
+			}()
 		}
 		// put log to log channel
 		data, err := task.Bytes()
