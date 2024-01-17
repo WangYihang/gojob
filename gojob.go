@@ -2,11 +2,13 @@ package gojob
 
 import (
 	"bufio"
+	"context"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Fanin takes a slice of channels and returns a single channel that
@@ -162,6 +164,7 @@ type Task interface {
 // Scheduler is a task scheduler
 type Scheduler struct {
 	NumWorkers     int
+	TimeoutSeconds int
 	OutputFilePath string
 	TaskChan       chan Task
 	LogChan        chan string
@@ -170,9 +173,10 @@ type Scheduler struct {
 }
 
 // NewScheduler creates a new scheduler
-func NewScheduler(numWorkers int, outputFilePath string) *Scheduler {
+func NewScheduler(numWorkers int, timeoutSeconds int, outputFilePath string) *Scheduler {
 	return &Scheduler{
 		NumWorkers:     numWorkers,
+		TimeoutSeconds: timeoutSeconds,
 		OutputFilePath: outputFilePath,
 		TaskChan:       make(chan Task, 1024),
 		LogChan:        make(chan string, 1024),
@@ -206,14 +210,13 @@ func (s *Scheduler) Wait() {
 // Worker is a worker
 func (s *Scheduler) Worker() {
 	for task := range s.TaskChan {
-		// do task
-		err := task.Do()
+		RunWithTimeout(task.Do, time.Duration(s.TimeoutSeconds)*time.Second)
 		// check if retry is needed
-		if err != nil && task.NeedRetry() {
+		if task.NeedRetry() {
 			s.taskWg.Add(1)
-			go func() {
-				s.TaskChan <- task
-			}()
+			go func(t Task) {
+				s.TaskChan <- t
+			}(task)
 		}
 		// put log to log channel
 		data, err := task.Bytes()
@@ -253,5 +256,23 @@ func (s *Scheduler) Writer() {
 	for result := range s.LogChan {
 		fd.WriteString(result + "\n")
 		s.logWg.Done()
+	}
+}
+
+func RunWithTimeout(f func() error, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	done := make(chan error, 1)
+
+	go func() {
+		done <- f()
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-done:
+		return err
 	}
 }
