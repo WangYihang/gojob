@@ -38,8 +38,7 @@ type MyTask struct {
 
 func New(url string) *MyTask {
 	return &MyTask{
-		Url:        url,
-		StatusCode: 0,
+		Url: url,
 	}
 }
 
