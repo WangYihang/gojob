@@ -3,6 +3,7 @@ package gojob
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -152,37 +153,49 @@ func Reduce[T interface{}](in chan T, f func(T, T) T) T {
 // Task is an interface that defines a task
 type Task interface {
 	// Do starts the task
-	Do(ctx context.Context) error
-	// Bytes serializes a task to a byte array, returns an error if the task is invalid
-	// For example, a task can be serialized to a line of a file
-	// You can store the result of a task in the task itself, when the task is serialized, the bytes of the result will be written to the log file
-	Bytes() ([]byte, error)
-	// NeedRetry returns true if the task needs to be retried
-	NeedRetry() bool
+	Do() error
+}
+
+type BasicTask struct {
+	StartedAt  int64  `json:"started_at"`
+	FinishedAt int64  `json:"finished_at"`
+	NumTries   int    `json:"num_tries"`
+	Task       Task   `json:"task"`
+	Error      string `json:"error"`
+}
+
+func NewBasicTask(task Task) *BasicTask {
+	return &BasicTask{
+		Task: task,
+	}
 }
 
 // Scheduler is a task scheduler
 type Scheduler struct {
-	NumWorkers     int
-	TimeoutSeconds int
-	OutputFilePath string
-	TaskChan       chan Task
-	LogChan        chan string
-	taskWg         *sync.WaitGroup
-	logWg          *sync.WaitGroup
+	NumWorkers               int
+	OutputFilePath           string
+	MaxRetries               int
+	MaxRuntimePerTaskSeconds int
+	TaskChan                 chan Task
+	LogChan                  chan string
+	taskWg                   *sync.WaitGroup
+	logWg                    *sync.WaitGroup
 }
 
 // NewScheduler creates a new scheduler
-func NewScheduler(numWorkers int, timeoutSeconds int, outputFilePath string) *Scheduler {
-	return &Scheduler{
-		NumWorkers:     numWorkers,
-		TimeoutSeconds: timeoutSeconds,
-		OutputFilePath: outputFilePath,
-		TaskChan:       make(chan Task, 1024),
-		LogChan:        make(chan string, 1024),
-		taskWg:         &sync.WaitGroup{},
-		logWg:          &sync.WaitGroup{},
+func NewScheduler(numWorkers int, maxRetries int, maxRuntimePerTaskSeconds int, outputFilePath string) *Scheduler {
+	scheduler := &Scheduler{
+		NumWorkers:               numWorkers,
+		OutputFilePath:           outputFilePath,
+		MaxRetries:               maxRetries,
+		MaxRuntimePerTaskSeconds: maxRuntimePerTaskSeconds,
+		TaskChan:                 make(chan Task),
+		LogChan:                  make(chan string),
+		taskWg:                   &sync.WaitGroup{},
+		logWg:                    &sync.WaitGroup{},
 	}
+	scheduler.Start()
+	return scheduler
 }
 
 // Submit submits a task to the scheduler
@@ -210,23 +223,33 @@ func (s *Scheduler) Wait() {
 // Worker is a worker
 func (s *Scheduler) Worker() {
 	for task := range s.TaskChan {
-		RunWithTimeout(task.Do, time.Duration(s.TimeoutSeconds)*time.Second)
-		// check if retry is needed
-		if task.NeedRetry() {
-			s.taskWg.Add(1)
-			go func(t Task) {
-				s.TaskChan <- t
-			}(task)
+		// Start task
+		bt := NewBasicTask(task)
+		for i := 0; i < s.MaxRetries; i++ {
+			err := func() error {
+				bt.StartedAt = time.Now().UnixMicro()
+				defer func() {
+					bt.NumTries++
+					bt.FinishedAt = time.Now().UnixMicro()
+				}()
+				return RunWithTimeout(task.Do, time.Duration(s.MaxRuntimePerTaskSeconds)*time.Second)
+			}()
+			if err != nil {
+				bt.Error = err.Error()
+			} else {
+				bt.Error = ""
+				break
+			}
 		}
-		// put log to log channel
-		data, err := task.Bytes()
+		// Serialize task
+		data, err := json.Marshal(bt)
 		if err != nil {
 			slog.Error("error occured while serializing task", slog.String("error", err.Error()))
 		} else {
 			s.logWg.Add(1)
 			s.LogChan <- string(data)
 		}
-		// notify task is done
+		// Notify task is done
 		s.taskWg.Done()
 	}
 }
@@ -261,14 +284,14 @@ func (s *Scheduler) Writer() {
 	}
 }
 
-func RunWithTimeout(f func(context.Context) error, timeout time.Duration) error {
+func RunWithTimeout(f func() error, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	done := make(chan error, 1)
 
 	go func() {
-		done <- f(ctx)
+		done <- f()
 	}()
 
 	select {
