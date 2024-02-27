@@ -64,16 +64,6 @@ func TestRunWithTimeout(t *testing.T) {
 	}
 }
 
-func TestSchedulerSubmit(t *testing.T) {
-	scheduler := gojob.NewScheduler().SetNumShards(2).SetShard(1)
-	safeWriter := NewSafeWriter()
-	task := NewTask(1, safeWriter)
-	scheduler.Submit(task)
-	if scheduler.NumDoneTasks.Load() != 1 {
-		t.Errorf("Expected NumTasks to be 1, got %d", scheduler.NumDoneTasks.Load())
-	}
-}
-
 func TestSharding(t *testing.T) {
 	testcases := []struct {
 		numShards int64

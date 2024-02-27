@@ -10,6 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/schollz/progressbar/v3"
 )
 
 // Task is an interface that defines a task
@@ -50,13 +52,11 @@ type Scheduler struct {
 	Shard                    int64
 	IsStarted                bool
 	CurrentIndex             atomic.Int64
-	NumDoneTasks             atomic.Int64
 	TaskChan                 chan *BasicTask
 	LogChan                  chan string
-	DoneChan                 chan struct{}
 	taskWg                   *sync.WaitGroup
 	logWg                    *sync.WaitGroup
-	progressWg               *sync.WaitGroup
+	progressBar              *progressbar.ProgressBar
 }
 
 // NewScheduler creates a new scheduler
@@ -69,13 +69,11 @@ func NewScheduler() *Scheduler {
 		NumShards:                3,
 		Shard:                    1,
 		IsStarted:                false,
-		NumDoneTasks:             atomic.Int64{},
 		TaskChan:                 make(chan *BasicTask),
 		LogChan:                  make(chan string),
-		DoneChan:                 make(chan struct{}),
 		taskWg:                   &sync.WaitGroup{},
 		logWg:                    &sync.WaitGroup{},
-		progressWg:               &sync.WaitGroup{},
+		progressBar:              progressbar.Default(-1),
 	}
 	return scheduler
 }
@@ -153,30 +151,8 @@ func (s *Scheduler) Start() *Scheduler {
 		go s.Worker()
 	}
 	go s.Writer()
-	s.progressWg.Add(1)
-	go s.Progress()
 	s.IsStarted = true
 	return s
-}
-
-// Progress prints progress
-func (s *Scheduler) Progress() {
-	previousNumDoneTasks := s.NumDoneTasks.Load()
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	defer s.progressWg.Done()
-	for {
-		select {
-		case <-ticker.C:
-			currentNumDoneTasks := s.NumDoneTasks.Load()
-			ops := currentNumDoneTasks - previousNumDoneTasks
-			slog.Info("progress", slog.String("status", "active"), slog.Int64("num_done_tasks", currentNumDoneTasks), slog.Int64("ops", ops))
-			previousNumDoneTasks = currentNumDoneTasks
-		case <-s.DoneChan:
-			slog.Info("progress", slog.String("status", "done"), slog.Int64("num_done_tasks", s.NumDoneTasks.Load()))
-			return
-		}
-	}
 }
 
 // Wait waits for all tasks to finish
@@ -185,8 +161,6 @@ func (s *Scheduler) Wait() {
 	close(s.TaskChan)
 	s.logWg.Wait()
 	close(s.LogChan)
-	close(s.DoneChan)
-	s.progressWg.Wait()
 }
 
 // Worker is a worker
@@ -219,7 +193,7 @@ func (s *Scheduler) Worker() {
 		}
 		// Notify task is done
 		s.taskWg.Done()
-		s.NumDoneTasks.Add(1)
+		s.progressBar.Add(1)
 	}
 }
 

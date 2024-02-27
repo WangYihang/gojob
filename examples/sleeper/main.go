@@ -32,7 +32,7 @@ func main() {
 		SetNumShards(4).
 		SetShard(0).
 		Start()
-	for i := 0; i < 16; i++ {
+	for i := 0; i < 256; i++ {
 		scheduler.Submit(New(i, rand.Intn(10)))
 	}
 	scheduler.Wait()
