@@ -15,6 +15,8 @@ type Options struct {
 	MaxRetries               int    `short:"r" long:"max-retries" description:"max retries" default:"3"`
 	MaxRuntimePerTaskSeconds int    `short:"t" long:"max-runtime-per-task-seconds" description:"max runtime per task seconds" default:"60"`
 	NumWorkers               int    `short:"n" long:"num-workers" description:"number of workers" default:"32"`
+	NumShards                int    `short:"s" long:"num-shards" description:"number of shards" default:"1"`
+	Shard                    int    `short:"d" long:"shard" description:"shard" default:"0"`
 }
 
 var opts Options
@@ -27,7 +29,14 @@ func init() {
 }
 
 func main() {
-	scheduler := gojob.NewScheduler(opts.NumWorkers, opts.MaxRuntimePerTaskSeconds, opts.MaxRetries, opts.OutputFilePath)
+	scheduler := gojob.NewScheduler().
+		SetNumWorkers(opts.NumWorkers).
+		SetMaxRetries(opts.MaxRetries).
+		SetMaxRuntimePerTaskSeconds(opts.MaxRuntimePerTaskSeconds).
+		SetNumShards(int64(opts.NumShards)).
+		SetShard(int64(opts.Shard)).
+		SetOutputFilePath(opts.OutputFilePath)
+
 	for line := range util.Cat(opts.InputFilePath) {
 		scheduler.Submit(model.New(string(line)))
 	}

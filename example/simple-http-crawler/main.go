@@ -29,7 +29,12 @@ func (t *MyTask) Do() error {
 }
 
 func main() {
-	scheduler := gojob.NewScheduler(1, 4, 8, "output.txt")
+	scheduler := gojob.NewScheduler().
+		SetNumWorkers(8).
+		SetMaxRetries(4).
+		SetMaxRuntimePerTaskSeconds(16).
+		SetNumShards(4).
+		SetShard(0)
 	for line := range util.Cat("input.txt") {
 		scheduler.Submit(New(line))
 	}
