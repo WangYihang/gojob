@@ -14,7 +14,9 @@ import (
 
 // Task is an interface that defines a task
 type Task interface {
-	// Do starts the task
+	// Do starts the task, returns error if failed
+	// If an error is returned, the task will be retried until MaxRetries
+	// You can set MaxRetries by calling SetMaxRetries on the scheduler
 	Do() error
 }
 

@@ -1,4 +1,4 @@
-# go(od)job
+# Go(od) Job
 
 gojob is a simple job scheduler.
 
@@ -15,7 +15,9 @@ Create a job scheduler with a worker pool of size 32. To do this, you need to im
 ```go
 // Task is an interface that defines a task
 type Task interface {
-	// Do starts the task
+	// Do starts the task, returns error if failed
+	// If an error is returned, the task will be retried until MaxRetries
+	// You can set MaxRetries by calling SetMaxRetries on the scheduler
 	Do() error
 }
 ```
@@ -29,6 +31,7 @@ import (
 	"net/http"
 
 	"github.com/WangYihang/gojob"
+	"github.com/WangYihang/gojob/pkg/util"
 )
 
 type MyTask struct {
@@ -53,8 +56,14 @@ func (t *MyTask) Do() error {
 }
 
 func main() {
-	scheduler := gojob.NewScheduler(1, 4, 8, "output.txt")
-	for line := range gojob.Cat("input.txt") {
+	scheduler := gojob.NewScheduler().
+		SetNumWorkers(8).
+		SetMaxRetries(4).
+		SetMaxRuntimePerTaskSeconds(16).
+		SetNumShards(4).
+		SetShard(0).
+		Start()
+	for line := range util.Cat("input.txt") {
 		scheduler.Submit(New(line))
 	}
 	scheduler.Wait()
