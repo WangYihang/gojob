@@ -1,7 +1,6 @@
 package gojob
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -11,52 +10,30 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/schollz/progressbar/v3"
+	"github.com/WangYihang/gojob/pkg/util"
 )
-
-// Task is an interface that defines a task
-type Task interface {
-	// Do starts the task, returns error if failed
-	// If an error is returned, the task will be retried until MaxRetries
-	// You can set MaxRetries by calling SetMaxRetries on the scheduler
-	Do() error
-}
-
-type BasicTask struct {
-	Index      int64  `json:"index"`
-	StartedAt  int64  `json:"started_at"`
-	FinishedAt int64  `json:"finished_at"`
-	NumTries   int    `json:"num_tries"`
-	Task       Task   `json:"task"`
-	Error      string `json:"error"`
-}
-
-func NewBasicTask(index int64, task Task) *BasicTask {
-	return &BasicTask{
-		Index:      index,
-		StartedAt:  0,
-		FinishedAt: 0,
-		NumTries:   0,
-		Task:       task,
-		Error:      "",
-	}
-}
 
 // Scheduler is a task scheduler
 type Scheduler struct {
 	NumWorkers               int
 	OutputFilePath           string
+	OutputFd                 io.WriteCloser
+	StatusFilePath           string
+	StatusFd                 io.WriteCloser
 	MaxRetries               int
 	MaxRuntimePerTaskSeconds int
 	NumShards                int64
 	Shard                    int64
 	IsStarted                bool
 	CurrentIndex             atomic.Int64
+	NumDoneTasks             atomic.Int64
+	NumTotalTasks            atomic.Int64
 	TaskChan                 chan *BasicTask
 	LogChan                  chan string
+	DoneChan                 chan struct{}
 	taskWg                   *sync.WaitGroup
 	logWg                    *sync.WaitGroup
-	progressBar              *progressbar.ProgressBar
+	statusWg                 *sync.WaitGroup
 }
 
 // NewScheduler creates a new scheduler
@@ -64,16 +41,23 @@ func NewScheduler() *Scheduler {
 	scheduler := &Scheduler{
 		NumWorkers:               1,
 		OutputFilePath:           "-",
+		OutputFd:                 os.Stdout,
+		StatusFilePath:           "-",
+		StatusFd:                 os.Stdout,
 		MaxRetries:               4,
 		MaxRuntimePerTaskSeconds: 16,
 		NumShards:                3,
 		Shard:                    1,
 		IsStarted:                false,
+		CurrentIndex:             atomic.Int64{},
+		NumDoneTasks:             atomic.Int64{},
+		NumTotalTasks:            atomic.Int64{},
 		TaskChan:                 make(chan *BasicTask),
 		LogChan:                  make(chan string),
+		DoneChan:                 make(chan struct{}),
 		taskWg:                   &sync.WaitGroup{},
 		logWg:                    &sync.WaitGroup{},
-		progressBar:              progressbar.Default(-1),
+		statusWg:                 &sync.WaitGroup{},
 	}
 	return scheduler
 }
@@ -108,6 +92,22 @@ func (s *Scheduler) SetNumWorkers(numWorkers int) *Scheduler {
 // SetOutputFilePath sets the output file path
 func (s *Scheduler) SetOutputFilePath(outputFilePath string) *Scheduler {
 	s.OutputFilePath = outputFilePath
+	fd, err := FilePathToFd(s.OutputFilePath)
+	if err != nil {
+		panic(err)
+	}
+	s.OutputFd = fd
+	return s
+}
+
+// SetStatusFilePath sets the status file path
+func (s *Scheduler) SetStatusFilePath(statusFilePath string) *Scheduler {
+	s.StatusFilePath = statusFilePath
+	fd, err := FilePathToFd(s.StatusFilePath)
+	if err != nil {
+		panic(err)
+	}
+	s.StatusFd = fd
 	return s
 }
 
@@ -127,6 +127,10 @@ func (s *Scheduler) SetMaxRuntimePerTaskSeconds(maxRuntimePerTaskSeconds int) *S
 	}
 	s.MaxRuntimePerTaskSeconds = maxRuntimePerTaskSeconds
 	return s
+}
+
+func (s *Scheduler) SetTotalTasks(numTotalTasks int64) {
+	s.NumTotalTasks.Store(numTotalTasks)
 }
 
 // Submit submits a task to the scheduler
@@ -150,7 +154,9 @@ func (s *Scheduler) Start() *Scheduler {
 	for i := 0; i < s.NumWorkers; i++ {
 		go s.Worker()
 	}
-	go s.Writer()
+	go s.ResultWriter()
+	s.statusWg.Add(1)
+	go s.StatusWriter()
 	s.IsStarted = true
 	return s
 }
@@ -161,6 +167,16 @@ func (s *Scheduler) Wait() {
 	close(s.TaskChan)
 	s.logWg.Wait()
 	close(s.LogChan)
+	close(s.DoneChan)
+	s.statusWg.Wait()
+}
+
+func (s *Scheduler) Status() Status {
+	return Status{
+		Timestamp: time.Now().Format(time.RFC3339),
+		NumDone:   s.NumDoneTasks.Load(),
+		NumTotal:  s.NumTotalTasks.Load(),
+	}
 }
 
 // Worker is a worker
@@ -174,7 +190,7 @@ func (s *Scheduler) Worker() {
 					task.NumTries++
 					task.FinishedAt = time.Now().UnixMicro()
 				}()
-				return RunWithTimeout(task.Task.Do, time.Duration(s.MaxRuntimePerTaskSeconds)*time.Second)
+				return util.RunWithTimeout(task.Task.Do, time.Duration(s.MaxRuntimePerTaskSeconds)*time.Second)
 			}()
 			if err != nil {
 				task.Error = err.Error()
@@ -193,44 +209,15 @@ func (s *Scheduler) Worker() {
 		}
 		// Notify task is done
 		s.taskWg.Done()
-		s.progressBar.Add(1)
+		s.NumDoneTasks.Add(1)
 	}
 }
 
-// Writer writes logs to file
-func (s *Scheduler) Writer() {
-	var fd io.Writer
-	var err error
-
-	switch s.OutputFilePath {
-	case "-":
-		fd = os.Stdout
-	case "":
-		fd = io.Discard
-	default:
-		// Create folder if not exists
-		dir := filepath.Dir(s.OutputFilePath)
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				slog.Error("error occurred while creating folder", slog.String("path", dir), slog.String("error", err.Error()))
-				return
-			}
-		}
-		// Open file
-		fd, err = os.OpenFile(s.OutputFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			slog.Error("error occurred while opening file", slog.String("path", s.OutputFilePath), slog.String("error", err.Error()))
-			return
-		}
-		defer func() {
-			if closeErr := fd.(*os.File).Close(); closeErr != nil {
-				slog.Error("error occurred while closing file", slog.String("path", s.OutputFilePath), slog.String("error", closeErr.Error()))
-			}
-		}()
-	}
-
+// ResultWriter writes logs to file
+func (s *Scheduler) ResultWriter() {
+	defer s.OutputFd.Close()
 	for result := range s.LogChan {
-		if _, err := fd.Write([]byte(result + "\n")); err != nil {
+		if _, err := s.OutputFd.Write([]byte(result + "\n")); err != nil {
 			slog.Error("error occurred while writing to file", slog.String("error", err.Error()))
 			continue
 		}
@@ -238,20 +225,49 @@ func (s *Scheduler) Writer() {
 	}
 }
 
-func RunWithTimeout(f func() error, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+func (s *Scheduler) StatusWriter() {
+	tick := time.NewTicker(1 * time.Second)
+	defer s.statusWg.Done()
+	defer s.StatusFd.Close()
+	defer tick.Stop()
+	for {
+		select {
+		case <-s.DoneChan:
+			s.StatusFd.Write([]byte(s.Status().String() + "\n"))
+			return
+		case <-tick.C:
+			s.StatusFd.Write([]byte(s.Status().String() + "\n"))
+		}
+	}
+}
 
-	done := make(chan error, 1)
+type writeCloserWrapper struct {
+	io.Writer
+}
 
-	go func() {
-		done <- f()
-	}()
+func (wc writeCloserWrapper) Close() error {
+	return nil
+}
 
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case err := <-done:
-		return err
+func FilePathToFd(path string) (io.WriteCloser, error) {
+	switch path {
+	case "-":
+		return os.Stdout, nil
+	case "":
+		return writeCloserWrapper{io.Discard}, nil
+	default:
+		// Create folder if not exists
+		dir := filepath.Dir(path)
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return nil, err
+			}
+		}
+		// Open file
+		fd, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return nil, err
+		}
+		return fd, nil
 	}
 }

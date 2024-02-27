@@ -21,8 +21,7 @@
 go.work
 
 # Example data files
-input.txt
-output.txt
+data/
 
 # Goreleaser
 dist/

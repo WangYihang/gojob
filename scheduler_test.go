@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/WangYihang/gojob"
 )
@@ -50,18 +49,6 @@ func NewTask(i int, writer *SafeWriter) *Task {
 func (t *Task) Do() error {
 	t.writer.WriteString(fmt.Sprintf("%d\n", t.I))
 	return nil
-}
-
-func TestRunWithTimeout(t *testing.T) {
-	task := func() error {
-		time.Sleep(2 * time.Second)
-		return nil
-	}
-
-	err := gojob.RunWithTimeout(task, 1*time.Second)
-	if err == nil {
-		t.Errorf("Expected timeout error, got nil")
-	}
 }
 
 func TestSharding(t *testing.T) {

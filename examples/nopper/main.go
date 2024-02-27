@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/WangYihang/gojob"
+	"github.com/WangYihang/gojob/pkg/util"
 )
 
 type MyTask struct{}
@@ -25,9 +26,10 @@ func main() {
 		SetMaxRuntimePerTaskSeconds(16).
 		SetNumShards(4).
 		SetShard(0).
-		SetOutputFilePath("test.txt").
+		SetOutputFilePath("data/output.txt").
+		SetStatusFilePath("data/output.status").
 		Start()
-	for i := 0; i < 257; i++ {
+	for range util.Cat("data/input.txt") {
 		scheduler.Submit(New())
 	}
 	scheduler.Wait()
