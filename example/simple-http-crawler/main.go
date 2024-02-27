@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/WangYihang/gojob"
+	"github.com/WangYihang/gojob/pkg/util"
 )
 
 type MyTask struct {
@@ -29,7 +30,7 @@ func (t *MyTask) Do() error {
 
 func main() {
 	scheduler := gojob.NewScheduler(1, 4, 8, "output.txt")
-	for line := range gojob.Cat("input.txt") {
+	for line := range util.Cat("input.txt") {
 		scheduler.Submit(New(line))
 	}
 	scheduler.Wait()

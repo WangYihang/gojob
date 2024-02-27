@@ -5,6 +5,7 @@ import (
 
 	"github.com/WangYihang/gojob"
 	"github.com/WangYihang/gojob/example/complex-http-crawler/pkg/model"
+	"github.com/WangYihang/gojob/pkg/util"
 	"github.com/jessevdk/go-flags"
 )
 
@@ -27,7 +28,7 @@ func init() {
 
 func main() {
 	scheduler := gojob.NewScheduler(opts.NumWorkers, opts.MaxRuntimePerTaskSeconds, opts.MaxRetries, opts.OutputFilePath)
-	for line := range gojob.Cat(opts.InputFilePath) {
+	for line := range util.Cat(opts.InputFilePath) {
 		scheduler.Submit(model.New(string(line)))
 	}
 	scheduler.Start()
