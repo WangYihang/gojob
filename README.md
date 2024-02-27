@@ -22,7 +22,7 @@ type Task interface {
 }
 ```
 
-The whole [code](./example/simple-http-crawler/main.go) looks like this.
+The whole [code](./examples/simple-http-crawler/main.go) looks like this.
 
 ```go
 package main
@@ -75,12 +75,12 @@ func main() {
 ### http-crawler
 
 Let's say you have a bunch of URLs that you want to crawl and save the HTTP response to a file. You can use gojob to do that.
-Check [it](./example/complex-http-crawler/) out for details.
+Check [it](./examples/complex-http-crawler/) out for details.
 
 Try it out using the following command.
 
 ```bash
-$ go run github.com/WangYihang/gojob/example/complex-http-crawler@latest --help                       
+$ go run github.com/WangYihang/gojob/examples/complex-http-crawler@latest --help                       
 Usage:
   main [OPTIONS]
 
@@ -103,7 +103,7 @@ https://www.youtube.com/
 ```
 
 ```
-$ go run github.com/WangYihang/gojob/example/complex-http-crawler@latest -i input.txt -o output.txt -n 4
+$ go run github.com/WangYihang/gojob/examples/complex-http-crawler@latest -i input.txt -o output.txt -n 4
 ```
 
 ```json
