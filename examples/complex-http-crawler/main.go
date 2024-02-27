@@ -41,6 +41,5 @@ func main() {
 	for line := range util.Cat(opts.InputFilePath) {
 		scheduler.Submit(model.New(string(line)))
 	}
-	scheduler.Start()
 	scheduler.Wait()
 }
