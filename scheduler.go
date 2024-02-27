@@ -43,7 +43,7 @@ func NewScheduler() *Scheduler {
 		OutputFilePath:           "-",
 		OutputFd:                 os.Stdout,
 		StatusFilePath:           "-",
-		StatusFd:                 os.Stdout,
+		StatusFd:                 os.Stderr,
 		MaxRetries:               4,
 		MaxRuntimePerTaskSeconds: 16,
 		NumShards:                3,
