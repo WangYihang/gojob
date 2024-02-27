@@ -18,8 +18,11 @@ func New(url string) *MyTask {
 }
 
 func (t *MyTask) Do() error {
+	transport := &http.Transport{
+		DisableCompression: true,
+	}
 	client := &http.Client{
-		// Disable follow redirection
+		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
