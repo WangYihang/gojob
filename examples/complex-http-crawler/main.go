@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/WangYihang/gojob"
-	"github.com/WangYihang/gojob/example/complex-http-crawler/pkg/model"
+	"github.com/WangYihang/gojob/examples/complex-http-crawler/pkg/model"
 	"github.com/WangYihang/gojob/pkg/util"
 	"github.com/jessevdk/go-flags"
 )
