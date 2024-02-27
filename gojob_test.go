@@ -69,8 +69,8 @@ func TestSchedulerSubmit(t *testing.T) {
 	safeWriter := NewSafeWriter()
 	task := NewTask(1, safeWriter)
 	scheduler.Submit(task)
-	if scheduler.NumTasks.Load() != 1 {
-		t.Errorf("Expected NumTasks to be 1, got %d", scheduler.NumTasks.Load())
+	if scheduler.NumDoneTasks.Load() != 1 {
+		t.Errorf("Expected NumTasks to be 1, got %d", scheduler.NumDoneTasks.Load())
 	}
 }
 

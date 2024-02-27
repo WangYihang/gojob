@@ -37,7 +37,6 @@ func main() {
 		SetShard(int64(opts.Shard)).
 		SetOutputFilePath(opts.OutputFilePath).
 		Start()
-
 	for line := range util.Cat(opts.InputFilePath) {
 		scheduler.Submit(model.New(string(line)))
 	}

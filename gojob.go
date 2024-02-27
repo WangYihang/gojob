@@ -49,11 +49,14 @@ type Scheduler struct {
 	NumShards                int64
 	Shard                    int64
 	IsStarted                bool
-	NumTasks                 atomic.Int64
+	CurrentIndex             atomic.Int64
+	NumDoneTasks             atomic.Int64
 	TaskChan                 chan *BasicTask
 	LogChan                  chan string
+	DoneChan                 chan struct{}
 	taskWg                   *sync.WaitGroup
 	logWg                    *sync.WaitGroup
+	progressWg               *sync.WaitGroup
 }
 
 // NewScheduler creates a new scheduler
@@ -66,11 +69,13 @@ func NewScheduler() *Scheduler {
 		NumShards:                3,
 		Shard:                    1,
 		IsStarted:                false,
-		NumTasks:                 atomic.Int64{},
+		NumDoneTasks:             atomic.Int64{},
 		TaskChan:                 make(chan *BasicTask),
 		LogChan:                  make(chan string),
+		DoneChan:                 make(chan struct{}),
 		taskWg:                   &sync.WaitGroup{},
 		logWg:                    &sync.WaitGroup{},
+		progressWg:               &sync.WaitGroup{},
 	}
 	return scheduler
 }
@@ -130,14 +135,13 @@ func (s *Scheduler) SetMaxRuntimePerTaskSeconds(maxRuntimePerTaskSeconds int) *S
 func (s *Scheduler) Submit(task Task) {
 	if !s.IsStarted {
 		s.Start()
-		s.IsStarted = true
 	}
-	index := s.NumTasks.Load()
+	index := s.CurrentIndex.Load()
 	if (index % s.NumShards) == s.Shard {
 		s.taskWg.Add(1)
 		s.TaskChan <- NewBasicTask(index, task)
 	}
-	s.NumTasks.Add(1)
+	s.CurrentIndex.Add(1)
 }
 
 // Start starts the scheduler
@@ -149,7 +153,30 @@ func (s *Scheduler) Start() *Scheduler {
 		go s.Worker()
 	}
 	go s.Writer()
+	s.progressWg.Add(1)
+	go s.Progress()
+	s.IsStarted = true
 	return s
+}
+
+// Progress prints progress
+func (s *Scheduler) Progress() {
+	previousNumDoneTasks := s.NumDoneTasks.Load()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	defer s.progressWg.Done()
+	for {
+		select {
+		case <-ticker.C:
+			currentNumDoneTasks := s.NumDoneTasks.Load()
+			ops := currentNumDoneTasks - previousNumDoneTasks
+			slog.Info("progress", slog.String("status", "active"), slog.Int64("num_done_tasks", currentNumDoneTasks), slog.Int64("ops", ops))
+			previousNumDoneTasks = currentNumDoneTasks
+		case <-s.DoneChan:
+			slog.Info("progress", slog.String("status", "done"), slog.Int64("num_done_tasks", s.NumDoneTasks.Load()))
+			return
+		}
+	}
 }
 
 // Wait waits for all tasks to finish
@@ -158,6 +185,8 @@ func (s *Scheduler) Wait() {
 	close(s.TaskChan)
 	s.logWg.Wait()
 	close(s.LogChan)
+	close(s.DoneChan)
+	s.progressWg.Wait()
 }
 
 // Worker is a worker
@@ -190,6 +219,7 @@ func (s *Scheduler) Worker() {
 		}
 		// Notify task is done
 		s.taskWg.Done()
+		s.NumDoneTasks.Add(1)
 	}
 }
 
