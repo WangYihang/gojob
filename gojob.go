@@ -3,6 +3,7 @@ package gojob
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -45,6 +46,7 @@ type Scheduler struct {
 	MaxRuntimePerTaskSeconds int
 	NumShards                int64
 	Shard                    int64
+	IsStarted                bool
 	NumTasks                 atomic.Int64
 	TaskChan                 chan *BasicTask
 	LogChan                  chan string
@@ -61,6 +63,7 @@ func NewScheduler() *Scheduler {
 		MaxRuntimePerTaskSeconds: 16,
 		NumShards:                3,
 		Shard:                    1,
+		IsStarted:                false,
 		NumTasks:                 atomic.Int64{},
 		TaskChan:                 make(chan *BasicTask),
 		LogChan:                  make(chan string),
@@ -123,6 +126,10 @@ func (s *Scheduler) SetMaxRuntimePerTaskSeconds(maxRuntimePerTaskSeconds int) *S
 
 // Submit submits a task to the scheduler
 func (s *Scheduler) Submit(task Task) {
+	if !s.IsStarted {
+		s.Start()
+		s.IsStarted = true
+	}
 	index := s.NumTasks.Load()
 	if (index % s.NumShards) == s.Shard {
 		s.taskWg.Add(1)
@@ -132,11 +139,15 @@ func (s *Scheduler) Submit(task Task) {
 }
 
 // Start starts the scheduler
-func (s *Scheduler) Start() {
+func (s *Scheduler) Start() *Scheduler {
+	if s.IsStarted {
+		return s
+	}
 	for i := 0; i < s.NumWorkers; i++ {
 		go s.Worker()
 	}
 	go s.Writer()
+	return s
 }
 
 // Wait waits for all tasks to finish
@@ -182,30 +193,41 @@ func (s *Scheduler) Worker() {
 
 // Writer writes logs to file
 func (s *Scheduler) Writer() {
-	var fd *os.File
+	var fd io.Writer
 	var err error
-	if s.OutputFilePath == "-" {
+
+	switch s.OutputFilePath {
+	case "-":
 		fd = os.Stdout
-	} else {
+	case "":
+		fd = io.Discard
+	default:
 		// Create folder if not exists
 		dir := filepath.Dir(s.OutputFilePath)
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			err = os.MkdirAll(dir, 0755)
-			if err != nil {
-				slog.Error("error occured while creating folder", slog.String("path", dir), slog.String("error", err.Error()))
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				slog.Error("error occurred while creating folder", slog.String("path", dir), slog.String("error", err.Error()))
 				return
 			}
 		}
 		// Open file
 		fd, err = os.OpenFile(s.OutputFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
-			slog.Error("error occured while opening file", slog.String("path", s.OutputFilePath), slog.String("error", err.Error()))
+			slog.Error("error occurred while opening file", slog.String("path", s.OutputFilePath), slog.String("error", err.Error()))
 			return
 		}
-		defer fd.Close()
+		defer func() {
+			if closeErr := fd.(*os.File).Close(); closeErr != nil {
+				slog.Error("error occurred while closing file", slog.String("path", s.OutputFilePath), slog.String("error", closeErr.Error()))
+			}
+		}()
 	}
+
 	for result := range s.LogChan {
-		fd.WriteString(result + "\n")
+		if _, err := fd.Write([]byte(result + "\n")); err != nil {
+			slog.Error("error occurred while writing to file", slog.String("error", err.Error()))
+			continue
+		}
 		s.logWg.Done()
 	}
 }

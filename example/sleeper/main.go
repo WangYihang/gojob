@@ -30,7 +30,8 @@ func main() {
 		SetMaxRetries(4).
 		SetMaxRuntimePerTaskSeconds(16).
 		SetNumShards(4).
-		SetShard(0)
+		SetShard(0).
+		Start()
 	scheduler.Start()
 	for i := 0; i < 256; i++ {
 		scheduler.Submit(New(i, rand.Intn(10)))

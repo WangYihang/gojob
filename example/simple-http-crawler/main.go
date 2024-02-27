@@ -34,7 +34,8 @@ func main() {
 		SetMaxRetries(4).
 		SetMaxRuntimePerTaskSeconds(16).
 		SetNumShards(4).
-		SetShard(0)
+		SetShard(0).
+		Start()
 	for line := range util.Cat("input.txt") {
 		scheduler.Submit(New(line))
 	}

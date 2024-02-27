@@ -35,7 +35,8 @@ func main() {
 		SetMaxRuntimePerTaskSeconds(opts.MaxRuntimePerTaskSeconds).
 		SetNumShards(int64(opts.NumShards)).
 		SetShard(int64(opts.Shard)).
-		SetOutputFilePath(opts.OutputFilePath)
+		SetOutputFilePath(opts.OutputFilePath).
+		Start()
 
 	for line := range util.Cat(opts.InputFilePath) {
 		scheduler.Submit(model.New(string(line)))
