@@ -43,12 +43,6 @@ type Scheduler struct {
 func NewScheduler() *Scheduler {
 	scheduler := &Scheduler{
 		NumWorkers:               1,
-		OutputFilePath:           "-",
-		OutputFd:                 os.Stdout,
-		StatusFilePath:           "-",
-		StatusFd:                 os.Stderr,
-		MetadataFilePath:         "-",
-		MetadataFd:               os.Stderr,
 		Metadata:                 make(map[string]string),
 		MaxRetries:               4,
 		MaxRuntimePerTaskSeconds: 16,
@@ -65,6 +59,9 @@ func NewScheduler() *Scheduler {
 		logWg:                    &sync.WaitGroup{},
 		statusWg:                 &sync.WaitGroup{},
 	}
+	scheduler.SetOutputFilePath("-")
+	scheduler.SetStatusFilePath("-")
+	scheduler.SetMetadataFilePath("-")
 	return scheduler
 }
 
@@ -103,6 +100,12 @@ func (s *Scheduler) SetOutputFilePath(outputFilePath string) *Scheduler {
 		panic(err)
 	}
 	s.OutputFd = fd
+	// Set status file path and metadata file path
+	if s.OutputFilePath != "-" && s.OutputFilePath != "" {
+		outputFilePathWithoutExt := outputFilePath[:len(outputFilePath)-len(filepath.Ext(outputFilePath))]
+		s.SetStatusFilePath(outputFilePathWithoutExt + ".status")
+		s.SetMetadataFilePath(outputFilePathWithoutExt + ".metadata")
+	}
 	return s
 }
 
@@ -208,7 +211,6 @@ func (s *Scheduler) Wait() {
 	close(s.LogChan)
 	close(s.DoneChan)
 	s.statusWg.Wait()
-	s.Save()
 	s.MetadataFd.Close()
 }
 
