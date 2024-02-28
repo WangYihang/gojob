@@ -20,6 +20,9 @@ type Scheduler struct {
 	OutputFd                 io.WriteCloser
 	StatusFilePath           string
 	StatusFd                 io.WriteCloser
+	MetadataFilePath         string
+	MetadataFd               io.WriteCloser
+	Metadata                 map[string]string
 	MaxRetries               int
 	MaxRuntimePerTaskSeconds int
 	NumShards                int64
@@ -44,6 +47,9 @@ func NewScheduler() *Scheduler {
 		OutputFd:                 os.Stdout,
 		StatusFilePath:           "-",
 		StatusFd:                 os.Stderr,
+		MetadataFilePath:         "-",
+		MetadataFd:               os.Stderr,
+		Metadata:                 make(map[string]string),
 		MaxRetries:               4,
 		MaxRuntimePerTaskSeconds: 16,
 		NumShards:                1,
@@ -111,6 +117,17 @@ func (s *Scheduler) SetStatusFilePath(statusFilePath string) *Scheduler {
 	return s
 }
 
+// SetMetadataFilePath sets the metadata file path
+func (s *Scheduler) SetMetadataFilePath(metadataFilePath string) *Scheduler {
+	s.MetadataFilePath = metadataFilePath
+	fd, err := FilePathToFd(s.MetadataFilePath)
+	if err != nil {
+		panic(err)
+	}
+	s.MetadataFd = fd
+	return s
+}
+
 // SetMaxRetries sets the max retries
 func (s *Scheduler) SetMaxRetries(maxRetries int) *Scheduler {
 	if maxRetries <= 0 {
@@ -129,8 +146,29 @@ func (s *Scheduler) SetMaxRuntimePerTaskSeconds(maxRuntimePerTaskSeconds int) *S
 	return s
 }
 
+// SetTotalTasks sets the total number of tasks
 func (s *Scheduler) SetTotalTasks(numTotalTasks int64) {
 	s.NumTotalTasks.Store(numTotalTasks)
+}
+
+// AddMetadata adds metadata
+func (s *Scheduler) SetMetadata(key, value string) *Scheduler {
+	if s.IsStarted {
+		panic("cannot add metadata after starting")
+	}
+	s.Metadata[key] = value
+	return s
+}
+
+// Save saves metadata
+func (s *Scheduler) Save() {
+	data, err := json.Marshal(s.Metadata)
+	if err != nil {
+		slog.Error("error occured while serializing metadata", slog.String("error", err.Error()))
+	} else {
+		s.MetadataFd.Write(data)
+		s.MetadataFd.Write([]byte("\n"))
+	}
 }
 
 // Submit submits a task to the scheduler
@@ -151,6 +189,7 @@ func (s *Scheduler) Start() *Scheduler {
 	if s.IsStarted {
 		return s
 	}
+	s.Save()
 	for i := 0; i < s.NumWorkers; i++ {
 		go s.Worker()
 	}
@@ -169,6 +208,7 @@ func (s *Scheduler) Wait() {
 	close(s.LogChan)
 	close(s.DoneChan)
 	s.statusWg.Wait()
+	s.Save()
 }
 
 func (s *Scheduler) Status() Status {
