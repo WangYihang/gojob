@@ -209,6 +209,7 @@ func (s *Scheduler) Wait() {
 	close(s.DoneChan)
 	s.statusWg.Wait()
 	s.Save()
+	s.MetadataFd.Close()
 }
 
 func (s *Scheduler) Status() Status {
