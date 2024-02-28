@@ -22,7 +22,7 @@ type Scheduler struct {
 	StatusFd                 io.WriteCloser
 	MetadataFilePath         string
 	MetadataFd               io.WriteCloser
-	Metadata                 map[string]string
+	Metadata                 map[string]interface{}
 	MaxRetries               int
 	MaxRuntimePerTaskSeconds int
 	NumShards                int64
@@ -43,7 +43,7 @@ type Scheduler struct {
 func NewScheduler() *Scheduler {
 	scheduler := &Scheduler{
 		NumWorkers:               1,
-		Metadata:                 make(map[string]string),
+		Metadata:                 make(map[string]interface{}),
 		MaxRetries:               4,
 		MaxRuntimePerTaskSeconds: 16,
 		NumShards:                1,
@@ -155,7 +155,7 @@ func (s *Scheduler) SetTotalTasks(numTotalTasks int64) {
 }
 
 // AddMetadata adds metadata
-func (s *Scheduler) SetMetadata(key, value string) *Scheduler {
+func (s *Scheduler) SetMetadata(key string, value interface{}) *Scheduler {
 	if s.IsStarted {
 		panic("cannot add metadata after starting")
 	}
