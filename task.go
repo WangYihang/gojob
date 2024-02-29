@@ -10,6 +10,7 @@ type Task interface {
 
 type BasicTask struct {
 	Index      int64  `json:"index"`
+	ID         string `json:"id"`
 	StartedAt  int64  `json:"started_at"`
 	FinishedAt int64  `json:"finished_at"`
 	NumTries   int    `json:"num_tries"`
@@ -17,9 +18,10 @@ type BasicTask struct {
 	Error      string `json:"error"`
 }
 
-func NewBasicTask(index int64, task Task) *BasicTask {
+func NewBasicTask(index int64, id string, task Task) *BasicTask {
 	return &BasicTask{
 		Index:      index,
+		ID:         id,
 		StartedAt:  0,
 		FinishedAt: 0,
 		NumTries:   0,

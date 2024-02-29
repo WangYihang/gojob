@@ -11,10 +11,12 @@ import (
 	"time"
 
 	"github.com/WangYihang/gojob/pkg/util"
+	"github.com/google/uuid"
 )
 
 // Scheduler is a task scheduler
 type Scheduler struct {
+	ID                       string
 	NumWorkers               int
 	OutputFilePath           string
 	OutputFd                 io.WriteCloser
@@ -41,7 +43,9 @@ type Scheduler struct {
 
 // NewScheduler creates a new scheduler
 func NewScheduler() *Scheduler {
-	scheduler := &Scheduler{
+	id := uuid.New().String()
+	return (&Scheduler{
+		ID:                       id,
 		NumWorkers:               1,
 		Metadata:                 make(map[string]interface{}),
 		MaxRetries:               4,
@@ -58,11 +62,11 @@ func NewScheduler() *Scheduler {
 		taskWg:                   &sync.WaitGroup{},
 		logWg:                    &sync.WaitGroup{},
 		statusWg:                 &sync.WaitGroup{},
-	}
-	scheduler.SetOutputFilePath("-")
-	scheduler.SetStatusFilePath("-")
-	scheduler.SetMetadataFilePath("-")
-	return scheduler
+	}).
+		SetOutputFilePath("-").
+		SetStatusFilePath("-").
+		SetMetadataFilePath("-").
+		SetMetadata("id", id)
 }
 
 // SetNumShards sets the number of shards, default is 1 which means no sharding
@@ -182,7 +186,7 @@ func (s *Scheduler) Submit(task Task) {
 	index := s.CurrentIndex.Load()
 	if (index % s.NumShards) == s.Shard {
 		s.taskWg.Add(1)
-		s.TaskChan <- NewBasicTask(index, task)
+		s.TaskChan <- NewBasicTask(index, s.ID, task)
 	}
 	s.CurrentIndex.Add(1)
 }
