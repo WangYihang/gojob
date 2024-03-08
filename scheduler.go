@@ -16,7 +16,7 @@ import (
 
 // Scheduler is a task scheduler
 type Scheduler struct {
-	ID                       string
+	RunID                    string
 	NumWorkers               int
 	OutputFilePath           string
 	OutputFd                 io.WriteCloser
@@ -45,7 +45,7 @@ type Scheduler struct {
 func NewScheduler() *Scheduler {
 	id := uuid.New().String()
 	return (&Scheduler{
-		ID:                       id,
+		RunID:                    id,
 		NumWorkers:               1,
 		Metadata:                 make(map[string]interface{}),
 		MaxRetries:               4,
@@ -186,7 +186,7 @@ func (s *Scheduler) Submit(task Task) {
 	index := s.CurrentIndex.Load()
 	if (index % s.NumShards) == s.Shard {
 		s.taskWg.Add(1)
-		s.TaskChan <- NewBasicTask(index, s.ID, task)
+		s.TaskChan <- NewBasicTask(index, s.RunID, task)
 	}
 	s.CurrentIndex.Add(1)
 }
