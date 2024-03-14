@@ -153,9 +153,30 @@ func (s *Scheduler) SetMaxRuntimePerTaskSeconds(maxRuntimePerTaskSeconds int) *S
 	return s
 }
 
-// SetTotalTasks sets the total number of tasks
 func (s *Scheduler) SetTotalTasks(numTotalTasks int64) *Scheduler {
-	s.NumTotalTasks.Store(numTotalTasks)
+	// Check if NumShards is set and is greater than 0
+	if s.NumShards <= 0 {
+		panic("NumShards must be greater than 0")
+	}
+
+	// Check if Shard is set and is within the valid range [0, NumShards)
+	if s.Shard < 0 || s.Shard >= s.NumShards {
+		panic("Shard must be within the range [0, NumShards)")
+	}
+
+	// Calculate the base number of tasks per shard
+	baseTasksPerShard := numTotalTasks / int64(s.NumShards)
+
+	// Calculate the remainder
+	remainder := numTotalTasks % int64(s.NumShards)
+
+	// Adjust task count for shards that need to handle an extra task due to the remainder
+	if int64(s.Shard) < remainder {
+		baseTasksPerShard++
+	}
+
+	// Store the number of tasks for this shard
+	s.NumTotalTasks.Store(baseTasksPerShard)
 	return s
 }
 
