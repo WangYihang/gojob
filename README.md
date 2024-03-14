@@ -22,7 +22,7 @@ type Task interface {
 }
 ```
 
-The whole [code](./examples/simple-http-crawler/main.go) looks like this.
+The whole [code](./examples/simple-http-crawler/main.go) looks like this (try it [online](https://go.dev/play/p/UiYextGte4v)).
 
 ```go
 package main
