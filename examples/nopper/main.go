@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/WangYihang/gojob"
-	"github.com/WangYihang/gojob/pkg/util"
+	"github.com/WangYihang/gojob/pkg/utils"
 )
 
 type MyTask struct{}
@@ -29,7 +29,7 @@ func main() {
 		SetOutputFilePath("data/output.txt").
 		SetStatusFilePath("data/output.status").
 		Start()
-	for range util.Cat("data/input.txt") {
+	for range utils.Cat("data/input.txt") {
 		scheduler.Submit(New())
 	}
 	scheduler.Wait()

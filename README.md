@@ -31,7 +31,7 @@ import (
 	"net/http"
 
 	"github.com/WangYihang/gojob"
-	"github.com/WangYihang/gojob/pkg/util"
+	"github.com/WangYihang/gojob/pkg/utils"
 )
 
 type MyTask struct {

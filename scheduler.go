@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/WangYihang/gojob/pkg/util"
+	"github.com/WangYihang/gojob/pkg/utils"
 	"github.com/google/uuid"
 )
 
@@ -120,7 +120,7 @@ func (s *Scheduler) SetStatusFilePath(statusFilePath string) *Scheduler {
 	if err != nil {
 		panic(err)
 	}
-	s.StatusFd = fd
+	s.StatusFd = utils.NewTeeWriterCloser(fd, os.Stderr)
 	return s
 }
 
@@ -131,7 +131,7 @@ func (s *Scheduler) SetMetadataFilePath(metadataFilePath string) *Scheduler {
 	if err != nil {
 		panic(err)
 	}
-	s.MetadataFd = fd
+	s.MetadataFd = utils.NewTeeWriterCloser(fd, os.Stderr)
 	return s
 }
 
@@ -237,7 +237,7 @@ func (s *Scheduler) Worker() {
 					task.NumTries++
 					task.FinishedAt = time.Now().UnixMicro()
 				}()
-				return util.RunWithTimeout(task.Task.Do, time.Duration(s.MaxRuntimePerTaskSeconds)*time.Second)
+				return utils.RunWithTimeout(task.Task.Do, time.Duration(s.MaxRuntimePerTaskSeconds)*time.Second)
 			}()
 			if err != nil {
 				task.Error = err.Error()

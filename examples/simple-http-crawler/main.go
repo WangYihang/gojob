@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/WangYihang/gojob"
-	"github.com/WangYihang/gojob/pkg/util"
+	"github.com/WangYihang/gojob/pkg/utils"
 )
 
 type MyTask struct {
@@ -36,7 +36,7 @@ func main() {
 		SetNumShards(4).
 		SetShard(0).
 		Start()
-	for line := range util.Cat("data/input.txt") {
+	for line := range utils.Cat("data/input.txt") {
 		scheduler.Submit(New(line))
 	}
 	scheduler.Wait()

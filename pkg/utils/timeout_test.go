@@ -1,10 +1,10 @@
-package util_test
+package utils_test
 
 import (
 	"testing"
 	"time"
 
-	"github.com/WangYihang/gojob/pkg/util"
+	"github.com/WangYihang/gojob/pkg/utils"
 )
 
 func TestRunWithTimeout(t *testing.T) {
@@ -13,7 +13,7 @@ func TestRunWithTimeout(t *testing.T) {
 		return nil
 	}
 
-	err := util.RunWithTimeout(task, 1*time.Second)
+	err := utils.RunWithTimeout(task, 1*time.Second)
 	if err == nil {
 		t.Errorf("Expected timeout error, got nil")
 	}

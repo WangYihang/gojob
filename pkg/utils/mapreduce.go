@@ -1,4 +1,4 @@
-package util
+package utils
 
 // Map takes a channel and returns a channel with the items that pass the filter
 func Map[T interface{}, U interface{}](in chan T, f func(T) U) chan U {
