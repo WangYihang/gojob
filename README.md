@@ -28,10 +28,10 @@ The whole [code](./examples/simple-http-crawler/main.go) looks like this.
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/WangYihang/gojob"
-	"github.com/WangYihang/gojob/pkg/utils"
 )
 
 type MyTask struct {
@@ -56,15 +56,18 @@ func (t *MyTask) Do() error {
 }
 
 func main() {
+	var numTotalTasks int64 = 256
 	scheduler := gojob.NewScheduler().
 		SetNumWorkers(8).
 		SetMaxRetries(4).
+		SetOutputFilePath("output.json").
 		SetMaxRuntimePerTaskSeconds(16).
 		SetNumShards(4).
 		SetShard(0).
+		SetTotalTasks(numTotalTasks).
 		Start()
-	for line := range util.Cat("input.txt") {
-		scheduler.Submit(New(line))
+	for i := range numTotalTasks {
+		scheduler.Submit(New(fmt.Sprintf("https://httpbin.org/task/%d", i)))
 	}
 	scheduler.Wait()
 }

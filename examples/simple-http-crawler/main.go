@@ -1,10 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/WangYihang/gojob"
-	"github.com/WangYihang/gojob/pkg/utils"
 )
 
 type MyTask struct {
@@ -12,7 +12,7 @@ type MyTask struct {
 	StatusCode int    `json:"status_code"`
 }
 
-func NewTask(url string) *MyTask {
+func New(url string) *MyTask {
 	return &MyTask{
 		Url: url,
 	}
@@ -29,18 +29,18 @@ func (t *MyTask) Do() error {
 }
 
 func main() {
-	inputFilePath := "data/input.txt"
-	total := utils.Count(utils.Cat(inputFilePath))
+	var numTotalTasks int64 = 256
 	scheduler := gojob.NewScheduler().
 		SetNumWorkers(8).
 		SetMaxRetries(4).
+		SetOutputFilePath("output.json").
 		SetMaxRuntimePerTaskSeconds(16).
 		SetNumShards(4).
 		SetShard(0).
-		SetTotalTasks(total).
+		SetTotalTasks(numTotalTasks).
 		Start()
-	for line := range utils.Cat("data/input.txt") {
-		scheduler.Submit(NewTask(line))
+	for i := range numTotalTasks {
+		scheduler.Submit(New(fmt.Sprintf("https://httpbin.org/task/%d", i)))
 	}
 	scheduler.Wait()
 }
