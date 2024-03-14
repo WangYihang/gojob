@@ -29,6 +29,7 @@ func init() {
 }
 
 func main() {
+	total := utils.Count(utils.Cat(opts.InputFilePath))
 	scheduler := gojob.NewScheduler().
 		SetNumWorkers(opts.NumWorkers).
 		SetMaxRetries(opts.MaxRetries).
@@ -36,6 +37,7 @@ func main() {
 		SetNumShards(int64(opts.NumShards)).
 		SetShard(int64(opts.Shard)).
 		SetOutputFilePath(opts.OutputFilePath).
+		SetTotalTasks(total).
 		Start()
 	for line := range utils.Cat(opts.InputFilePath) {
 		scheduler.Submit(model.New(string(line)))

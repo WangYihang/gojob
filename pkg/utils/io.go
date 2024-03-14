@@ -72,3 +72,11 @@ func Cat(filePath string) <-chan string {
 
 	return out
 }
+
+// Count takes a channel and returns the number of items
+func Count[T any](in <-chan T) (count int64) {
+	for range in {
+		count++
+	}
+	return count
+}

@@ -154,8 +154,9 @@ func (s *Scheduler) SetMaxRuntimePerTaskSeconds(maxRuntimePerTaskSeconds int) *S
 }
 
 // SetTotalTasks sets the total number of tasks
-func (s *Scheduler) SetTotalTasks(numTotalTasks int64) {
+func (s *Scheduler) SetTotalTasks(numTotalTasks int64) *Scheduler {
 	s.NumTotalTasks.Store(numTotalTasks)
+	return s
 }
 
 // AddMetadata adds metadata

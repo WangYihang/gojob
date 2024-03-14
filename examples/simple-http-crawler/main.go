@@ -12,7 +12,7 @@ type MyTask struct {
 	StatusCode int    `json:"status_code"`
 }
 
-func New(url string) *MyTask {
+func NewTask(url string) *MyTask {
 	return &MyTask{
 		Url: url,
 	}
@@ -29,15 +29,18 @@ func (t *MyTask) Do() error {
 }
 
 func main() {
+	inputFilePath := "data/input.txt"
+	total := utils.Count(utils.Cat(inputFilePath))
 	scheduler := gojob.NewScheduler().
 		SetNumWorkers(8).
 		SetMaxRetries(4).
 		SetMaxRuntimePerTaskSeconds(16).
 		SetNumShards(4).
 		SetShard(0).
+		SetTotalTasks(total).
 		Start()
 	for line := range utils.Cat("data/input.txt") {
-		scheduler.Submit(New(line))
+		scheduler.Submit(NewTask(line))
 	}
 	scheduler.Wait()
 }

@@ -25,6 +25,7 @@ func (t *MyTask) Do() error {
 }
 
 func main() {
+	total := 256
 	scheduler := gojob.NewScheduler().
 		SetNumWorkers(8).
 		SetMaxRetries(4).
@@ -32,8 +33,9 @@ func main() {
 		SetNumShards(4).
 		SetShard(0).
 		SetOutputFilePath("output.txt").
+		SetTotalTasks(int64(total)).
 		Start()
-	for i := 0; i < 256; i++ {
+	for i := 0; i < total; i++ {
 		scheduler.Submit(New(i, rand.Intn(10)))
 	}
 	scheduler.Wait()

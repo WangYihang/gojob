@@ -20,6 +20,8 @@ func (t *MyTask) Do() error {
 }
 
 func main() {
+	inputFilePath := "data/input.txt"
+	total := utils.Count(utils.Cat(inputFilePath))
 	scheduler := gojob.NewScheduler().
 		SetNumWorkers(8).
 		SetMaxRetries(4).
@@ -28,8 +30,9 @@ func main() {
 		SetShard(0).
 		SetOutputFilePath("data/output.txt").
 		SetStatusFilePath("data/output.status").
+		SetTotalTasks(total).
 		Start()
-	for range utils.Cat("data/input.txt") {
+	for range utils.Cat(inputFilePath) {
 		scheduler.Submit(New())
 	}
 	scheduler.Wait()
