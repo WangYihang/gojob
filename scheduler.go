@@ -31,8 +31,9 @@ type Scheduler struct {
 	Shard                    int64
 	IsStarted                bool
 	CurrentIndex             atomic.Int64
-	NumDoneTasks             atomic.Int64
-	NumTotalTasks            atomic.Int64
+	FailedTaskCount          atomic.Int64
+	SucceedTaskCount         atomic.Int64
+	TotalTaskCount           atomic.Int64
 	TaskChan                 chan *BasicTask
 	LogChan                  chan string
 	DoneChan                 chan struct{}
@@ -54,8 +55,8 @@ func NewScheduler() *Scheduler {
 		Shard:                    0,
 		IsStarted:                false,
 		CurrentIndex:             atomic.Int64{},
-		NumDoneTasks:             atomic.Int64{},
-		NumTotalTasks:            atomic.Int64{},
+		SucceedTaskCount:         atomic.Int64{},
+		TotalTaskCount:           atomic.Int64{},
 		TaskChan:                 make(chan *BasicTask),
 		LogChan:                  make(chan string),
 		DoneChan:                 make(chan struct{}),
@@ -176,7 +177,7 @@ func (s *Scheduler) SetTotalTasks(numTotalTasks int64) *Scheduler {
 	}
 
 	// Store the number of tasks for this shard
-	s.NumTotalTasks.Store(baseTasksPerShard)
+	s.TotalTaskCount.Store(baseTasksPerShard)
 	return s
 }
 
@@ -240,12 +241,8 @@ func (s *Scheduler) Wait() {
 	s.MetadataFd.Close()
 }
 
-func (s *Scheduler) Status() Status {
-	return Status{
-		Timestamp: time.Now().Format(time.RFC3339),
-		NumDone:   s.NumDoneTasks.Load(),
-		NumTotal:  s.NumTotalTasks.Load(),
-	}
+func (s *Scheduler) Status() *Status {
+	return NewStatus(s.FailedTaskCount.Load(), s.SucceedTaskCount.Load(), s.TotalTaskCount.Load())
 }
 
 // Worker is a worker
@@ -272,13 +269,14 @@ func (s *Scheduler) Worker() {
 		data, err := json.Marshal(task)
 		if err != nil {
 			slog.Error("error occured while serializing task", slog.String("error", err.Error()))
+			s.FailedTaskCount.Add(1)
 		} else {
 			s.logWg.Add(1)
 			s.LogChan <- string(data)
+			s.SucceedTaskCount.Add(1)
 		}
 		// Notify task is done
 		s.taskWg.Done()
-		s.NumDoneTasks.Add(1)
 	}
 }
 

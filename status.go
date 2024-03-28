@@ -3,9 +3,21 @@ package gojob
 import "encoding/json"
 
 type Status struct {
-	Timestamp string `json:"timestamp"`
-	NumDone   int64  `json:"num_done"`
-	NumTotal  int64  `json:"num_total"`
+	Timestamp         string `json:"timestamp"`
+	FailedTaskCount   int64  `json:"num_failed"`
+	SucceedTaskCount  int64  `json:"num_succeed"`
+	FinishedTaskCount int64  `json:"num_done"`
+	TotalTaskCount    int64  `json:"num_total"`
+}
+
+func NewStatus(failedTaskCount, succeedTaskCount, totalTaskCount int64) *Status {
+	return &Status{
+		Timestamp:         "",
+		FailedTaskCount:   failedTaskCount,
+		SucceedTaskCount:  succeedTaskCount,
+		FinishedTaskCount: failedTaskCount + succeedTaskCount,
+		TotalTaskCount:    totalTaskCount,
+	}
 }
 
 func (s Status) String() string {
