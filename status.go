@@ -1,6 +1,9 @@
 package gojob
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Status struct {
 	Timestamp         string `json:"timestamp"`
@@ -12,7 +15,7 @@ type Status struct {
 
 func NewStatus(failedTaskCount, succeedTaskCount, totalTaskCount int64) *Status {
 	return &Status{
-		Timestamp:         "",
+		Timestamp:         time.Now().Format(time.RFC3339),
 		FailedTaskCount:   failedTaskCount,
 		SucceedTaskCount:  succeedTaskCount,
 		FinishedTaskCount: failedTaskCount + succeedTaskCount,
