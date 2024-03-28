@@ -269,10 +269,13 @@ func (s *Scheduler) Worker() {
 		data, err := json.Marshal(task)
 		if err != nil {
 			slog.Error("error occured while serializing task", slog.String("error", err.Error()))
-			s.FailedTaskCount.Add(1)
 		} else {
 			s.logWg.Add(1)
 			s.LogChan <- string(data)
+		}
+		if task.Error != "" {
+			s.FailedTaskCount.Add(1)
+		} else {
 			s.SucceedTaskCount.Add(1)
 		}
 		// Notify task is done
