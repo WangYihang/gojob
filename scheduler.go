@@ -190,8 +190,8 @@ func (s *Scheduler) SetMetadata(key string, value interface{}) *Scheduler {
 	return s
 }
 
-func (s *Scheduler) AddLogChan() *Scheduler {
-	s.LogChans = append(s.LogChans, make(chan string))
+func (s *Scheduler) AddLogChan(c chan string) *Scheduler {
+	s.LogChans = append(s.LogChans, c)
 	return s
 }
 
