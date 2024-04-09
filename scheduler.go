@@ -35,7 +35,7 @@ type Scheduler struct {
 	SucceedTaskCount         atomic.Int64
 	TotalTaskCount           atomic.Int64
 	TaskChan                 chan *BasicTask
-	LogChan                  chan string
+	LogChans                 []chan string
 	DoneChan                 chan struct{}
 	taskWg                   *sync.WaitGroup
 	logWg                    *sync.WaitGroup
@@ -58,7 +58,7 @@ func NewScheduler() *Scheduler {
 		SucceedTaskCount:         atomic.Int64{},
 		TotalTaskCount:           atomic.Int64{},
 		TaskChan:                 make(chan *BasicTask),
-		LogChan:                  make(chan string),
+		LogChans:                 []chan string{make(chan string)},
 		DoneChan:                 make(chan struct{}),
 		taskWg:                   &sync.WaitGroup{},
 		logWg:                    &sync.WaitGroup{},
@@ -190,6 +190,11 @@ func (s *Scheduler) SetMetadata(key string, value interface{}) *Scheduler {
 	return s
 }
 
+func (s *Scheduler) AddLogChan() *Scheduler {
+	s.LogChans = append(s.LogChans, make(chan string))
+	return s
+}
+
 // Save saves metadata
 func (s *Scheduler) Save() {
 	data, err := json.Marshal(s.Metadata)
@@ -235,7 +240,9 @@ func (s *Scheduler) Wait() {
 	s.taskWg.Wait()
 	close(s.TaskChan)
 	s.logWg.Wait()
-	close(s.LogChan)
+	for _, logChan := range s.LogChans {
+		close(logChan)
+	}
 	close(s.DoneChan)
 	s.statusWg.Wait()
 	s.MetadataFd.Close()
@@ -271,7 +278,9 @@ func (s *Scheduler) Worker() {
 			slog.Error("error occured while serializing task", slog.String("error", err.Error()))
 		} else {
 			s.logWg.Add(1)
-			s.LogChan <- string(data)
+			for _, logChan := range s.LogChans {
+				logChan <- string(data)
+			}
 		}
 		if task.Error != "" {
 			s.FailedTaskCount.Add(1)
@@ -286,12 +295,14 @@ func (s *Scheduler) Worker() {
 // ResultWriter writes logs to file
 func (s *Scheduler) ResultWriter() {
 	defer s.OutputFd.Close()
-	for result := range s.LogChan {
-		if _, err := s.OutputFd.Write([]byte(result + "\n")); err != nil {
-			slog.Error("error occurred while writing to file", slog.String("error", err.Error()))
-			continue
+	for _, logChan := range s.LogChans {
+		for result := range logChan {
+			if _, err := s.OutputFd.Write([]byte(result + "\n")); err != nil {
+				slog.Error("error occurred while writing to file", slog.String("error", err.Error()))
+				continue
+			}
+			s.logWg.Done()
 		}
-		s.logWg.Done()
 	}
 }
 
