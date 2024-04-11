@@ -8,7 +8,7 @@ import (
 )
 
 // Head takes a channel and returns a channel with the first n items
-func Head[T interface{}](in chan T, max int) chan T {
+func Head[T interface{}](in <-chan T, max int) <-chan T {
 	out := make(chan T)
 	go func() {
 		defer close(out)
@@ -25,7 +25,7 @@ func Head[T interface{}](in chan T, max int) chan T {
 }
 
 // Tail takes a channel and returns a channel with the last n items
-func Tail[T interface{}](in chan T, max int) chan T {
+func Tail[T interface{}](in <-chan T, max int) <-chan T {
 	out := make(chan T)
 	go func() {
 		defer close(out)
