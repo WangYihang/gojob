@@ -1,5 +1,7 @@
 package gojob
 
+import "github.com/google/uuid"
+
 // Task is an interface that defines a task
 type Task interface {
 	// Do starts the task, returns error if failed
@@ -10,6 +12,7 @@ type Task interface {
 
 type BasicTask struct {
 	Index      int64  `json:"index"`
+	RunID      string `json:"run_id"`
 	ID         string `json:"id"`
 	StartedAt  int64  `json:"started_at"`
 	FinishedAt int64  `json:"finished_at"`
@@ -18,10 +21,11 @@ type BasicTask struct {
 	Error      string `json:"error"`
 }
 
-func NewBasicTask(index int64, id string, task Task) *BasicTask {
+func NewBasicTask(index int64, runID string, task Task) *BasicTask {
 	return &BasicTask{
 		Index:      index,
-		ID:         id,
+		RunID:      runID,
+		ID:         uuid.New().String(),
 		StartedAt:  0,
 		FinishedAt: 0,
 		NumTries:   0,
