@@ -1,5 +1,8 @@
 # Go(od) Job
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/WangYihang/gojob.svg)](https://pkg.go.dev/github.com/WangYihang/gojob)
+[![Go Report Card](https://goreportcard.com/badge/github.com/WangYihang/gojob)](https://goreportcard.com/report/github.com/WangYihang/gojob)
+
 gojob is a simple job scheduler.
 
 ## Install
