@@ -2,6 +2,7 @@ package gojob
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -14,256 +15,309 @@ import (
 	"github.com/google/uuid"
 )
 
+type Metadata map[string]interface{}
+
 // Scheduler is a task scheduler
 type Scheduler struct {
-	RunID                    string
-	NumWorkers               int
-	OutputFilePath           string
-	OutputFd                 io.WriteCloser
-	StatusFilePath           string
-	StatusFd                 io.WriteCloser
-	MetadataFilePath         string
-	MetadataFd               io.WriteCloser
-	Metadata                 map[string]interface{}
-	MaxRetries               int
-	MaxRuntimePerTaskSeconds int
-	NumShards                int64
-	Shard                    int64
-	IsStarted                bool
-	CurrentIndex             atomic.Int64
-	FailedTaskCount          atomic.Int64
-	SucceedTaskCount         atomic.Int64
-	TotalTaskCount           atomic.Int64
-	TaskChan                 chan *BasicTask
-	LogChans                 []chan string
-	DoneChan                 chan struct{}
-	taskWg                   *sync.WaitGroup
-	logWg                    *sync.WaitGroup
-	statusWg                 *sync.WaitGroup
+	id         string
+	numWorkers int
+	metadata   Metadata
+
+	maxRetries               int
+	maxRuntimePerTaskSeconds int
+
+	numShards int64
+	shard     int64
+
+	isStarted    atomic.Bool
+	currentIndex atomic.Int64
+
+	statusManager *StatusManager
+
+	taskChan    chan *BasicTask
+	resultChans []chan *BasicTask
+
+	resultFilePath           string
+	statusFilePath           string
+	metadataFilePath         string
+	prometheusPushGatewayUrl string
+	prometheusPushGatewayJob string
+
+	taskWg     *sync.WaitGroup
+	recorderWg *sync.WaitGroup
 }
 
-// NewScheduler creates a new scheduler
-func NewScheduler() *Scheduler {
+type SchedulerOption func(*Scheduler) error
+
+func New(options ...SchedulerOption) *Scheduler {
 	id := uuid.New().String()
-	return (&Scheduler{
-		RunID:                    id,
-		NumWorkers:               1,
-		Metadata:                 make(map[string]interface{}),
-		MaxRetries:               4,
-		MaxRuntimePerTaskSeconds: 16,
-		NumShards:                1,
-		Shard:                    0,
-		IsStarted:                false,
-		CurrentIndex:             atomic.Int64{},
-		SucceedTaskCount:         atomic.Int64{},
-		TotalTaskCount:           atomic.Int64{},
-		TaskChan:                 make(chan *BasicTask),
-		LogChans:                 []chan string{make(chan string)},
-		DoneChan:                 make(chan struct{}),
-		taskWg:                   &sync.WaitGroup{},
-		logWg:                    &sync.WaitGroup{},
-		statusWg:                 &sync.WaitGroup{},
-	}).
-		SetOutputFilePath("-").
-		SetStatusFilePath("-").
-		SetMetadataFilePath("-").
-		SetMetadata("id", id)
+	svr := &Scheduler{
+		id:         id,
+		numWorkers: 1,
+		metadata:   Metadata{"id": id},
+
+		maxRetries:               4,
+		maxRuntimePerTaskSeconds: 16,
+
+		numShards: 1,
+		shard:     0,
+
+		isStarted:    atomic.Bool{},
+		currentIndex: atomic.Int64{},
+
+		statusManager: NewStatusManager(),
+
+		taskChan:    make(chan *BasicTask),
+		resultChans: []chan *BasicTask{},
+
+		resultFilePath:   "result.json",
+		statusFilePath:   "status.json",
+		metadataFilePath: "metadata.json",
+
+		prometheusPushGatewayUrl: "",
+		prometheusPushGatewayJob: "gojob",
+
+		taskWg:     &sync.WaitGroup{},
+		recorderWg: &sync.WaitGroup{},
+	}
+	for _, opt := range options {
+		err := opt(svr)
+		if err != nil {
+			panic(err)
+		}
+	}
+	go svr.statusManager.Start()
+	svr.recorderWg.Add(3)
+	chanRecorder(svr.resultFilePath, svr.ResultChan(), svr.recorderWg)
+	chanRecorder(svr.statusFilePath, svr.StatusChan(), svr.recorderWg)
+	metadataChan := make(chan Metadata)
+	chanRecorder(svr.metadataFilePath, metadataChan, svr.recorderWg)
+	metadataChan <- svr.metadata
+	close(metadataChan)
+	if svr.prometheusPushGatewayUrl != "" {
+		svr.recorderWg.Add(1)
+		prometheusPusher(svr.prometheusPushGatewayUrl, svr.prometheusPushGatewayJob, svr.StatusChan(), svr.recorderWg)
+	}
+	return svr
 }
 
 // SetNumShards sets the number of shards, default is 1 which means no sharding
-func (s *Scheduler) SetNumShards(numShards int64) *Scheduler {
-	if numShards <= 0 {
-		panic("numShards must be greater than 0")
+func WithNumShards(numShards int64) SchedulerOption {
+	return func(s *Scheduler) error {
+		if numShards <= 0 {
+			return fmt.Errorf("numShards must be greater than 0")
+		}
+		s.numShards = numShards
+		return nil
 	}
-	s.NumShards = numShards
-	return s
 }
 
 // SetShard sets the shard (from 0 to NumShards-1)
-func (s *Scheduler) SetShard(shard int64) *Scheduler {
-	if shard < 0 || shard >= s.NumShards {
-		panic("shard must be in [0, NumShards)")
+func WithShard(shard int64) SchedulerOption {
+	return func(s *Scheduler) error {
+		if shard < 0 || shard >= s.numShards {
+			return fmt.Errorf("shard must be in [0, NumShards)")
+		}
+		s.shard = shard
+		return nil
 	}
-	s.Shard = shard
-	return s
 }
 
 // SetNumWorkers sets the number of workers
-func (s *Scheduler) SetNumWorkers(numWorkers int) *Scheduler {
-	if numWorkers <= 0 {
-		panic("numWorkers must be greater than 0")
+func WithNumWorkers(numWorkers int) SchedulerOption {
+	return func(s *Scheduler) error {
+		if numWorkers <= 0 {
+			return fmt.Errorf("numWorkers must be greater than 0")
+		}
+		s.numWorkers = numWorkers
+		return nil
 	}
-	s.NumWorkers = numWorkers
-	return s
-}
-
-// SetOutputFilePath sets the output file path
-func (s *Scheduler) SetOutputFilePath(outputFilePath string) *Scheduler {
-	s.OutputFilePath = outputFilePath
-	fd, err := FilePathToFd(s.OutputFilePath)
-	if err != nil {
-		panic(err)
-	}
-	s.OutputFd = fd
-	// Set status file path and metadata file path
-	if s.OutputFilePath != "-" && s.OutputFilePath != "" {
-		outputFilePathWithoutExt := outputFilePath[:len(outputFilePath)-len(filepath.Ext(outputFilePath))]
-		s.SetStatusFilePath(outputFilePathWithoutExt + ".status")
-		s.SetMetadataFilePath(outputFilePathWithoutExt + ".metadata")
-	}
-	return s
-}
-
-// SetStatusFilePath sets the status file path
-func (s *Scheduler) SetStatusFilePath(statusFilePath string) *Scheduler {
-	s.StatusFilePath = statusFilePath
-	fd, err := FilePathToFd(s.StatusFilePath)
-	if err != nil {
-		panic(err)
-	}
-	s.StatusFd = utils.NewTeeWriterCloser(fd, os.Stderr)
-	return s
-}
-
-// SetMetadataFilePath sets the metadata file path
-func (s *Scheduler) SetMetadataFilePath(metadataFilePath string) *Scheduler {
-	s.MetadataFilePath = metadataFilePath
-	fd, err := FilePathToFd(s.MetadataFilePath)
-	if err != nil {
-		panic(err)
-	}
-	s.MetadataFd = utils.NewTeeWriterCloser(fd, os.Stderr)
-	return s
 }
 
 // SetMaxRetries sets the max retries
-func (s *Scheduler) SetMaxRetries(maxRetries int) *Scheduler {
-	if maxRetries <= 0 {
-		panic("maxRetries must be greater than 0")
+func WithMaxRetries(maxRetries int) SchedulerOption {
+	return func(s *Scheduler) error {
+		if maxRetries <= 0 {
+			return fmt.Errorf("maxRetries must be greater than 0")
+		}
+		s.maxRetries = maxRetries
+		return nil
 	}
-	s.MaxRetries = maxRetries
-	return s
 }
 
 // SetMaxRuntimePerTaskSeconds sets the max runtime per task seconds
-func (s *Scheduler) SetMaxRuntimePerTaskSeconds(maxRuntimePerTaskSeconds int) *Scheduler {
-	if maxRuntimePerTaskSeconds <= 0 {
-		panic("maxRuntimePerTaskSeconds must be greater than 0")
+func WithMaxRuntimePerTaskSeconds(maxRuntimePerTaskSeconds int) SchedulerOption {
+	return func(s *Scheduler) error {
+		if maxRuntimePerTaskSeconds <= 0 {
+			return fmt.Errorf("maxRuntimePerTaskSeconds must be greater than 0")
+		}
+		s.maxRuntimePerTaskSeconds = maxRuntimePerTaskSeconds
+		return nil
 	}
-	s.MaxRuntimePerTaskSeconds = maxRuntimePerTaskSeconds
-	return s
 }
 
-func (s *Scheduler) SetTotalTasks(numTotalTasks int64) *Scheduler {
-	// Check if NumShards is set and is greater than 0
-	if s.NumShards <= 0 {
-		panic("NumShards must be greater than 0")
+// WithTotalTasks sets the total number of tasks, and calculates the number of tasks for this shard
+func WithTotalTasks(numTotalTasks int64) SchedulerOption {
+	return func(s *Scheduler) error {
+		// Check if NumShards is set and is greater than 0
+		if s.numShards <= 0 {
+			return fmt.Errorf("number of shards must be greater than 0")
+		}
+
+		// Check if Shard is set and is within the valid range [0, NumShards)
+		if s.shard < 0 || s.shard >= s.numShards {
+			return fmt.Errorf("shard must be within the range [0, NumShards)")
+		}
+
+		// Calculate the base number of tasks per shard
+		baseTasksPerShard := numTotalTasks / int64(s.numShards)
+
+		// Calculate the remainder
+		remainder := numTotalTasks % int64(s.numShards)
+
+		// Adjust task count for shards that need to handle an extra task due to the remainder
+		if int64(s.shard) < remainder {
+			baseTasksPerShard++
+		}
+
+		// Store the number of tasks for this shard
+		s.statusManager.SetTotal(baseTasksPerShard)
+		return nil
 	}
-
-	// Check if Shard is set and is within the valid range [0, NumShards)
-	if s.Shard < 0 || s.Shard >= s.NumShards {
-		panic("Shard must be within the range [0, NumShards)")
-	}
-
-	// Calculate the base number of tasks per shard
-	baseTasksPerShard := numTotalTasks / int64(s.NumShards)
-
-	// Calculate the remainder
-	remainder := numTotalTasks % int64(s.NumShards)
-
-	// Adjust task count for shards that need to handle an extra task due to the remainder
-	if int64(s.Shard) < remainder {
-		baseTasksPerShard++
-	}
-
-	// Store the number of tasks for this shard
-	s.TotalTaskCount.Store(baseTasksPerShard)
-	return s
 }
 
 // AddMetadata adds metadata
-func (s *Scheduler) SetMetadata(key string, value interface{}) *Scheduler {
-	if s.IsStarted {
-		panic("cannot add metadata after starting")
+func WithMetadata(key string, value interface{}) SchedulerOption {
+	return func(s *Scheduler) error {
+		s.metadata[key] = value
+		return nil
 	}
-	s.Metadata[key] = value
-	return s
 }
 
-func (s *Scheduler) AddLogChan(c chan string) *Scheduler {
-	s.LogChans = append(s.LogChans, c)
-	return s
+// WithResultFilePath sets the file path for results
+func WithResultFilePath(path string) SchedulerOption {
+	return func(s *Scheduler) error {
+		s.resultFilePath = path
+		return nil
+	}
 }
 
-// Save saves metadata
-func (s *Scheduler) Save() {
-	data, err := json.Marshal(s.Metadata)
+// WithStatusFilePath sets the file path for status
+func WithStatusFilePath(path string) SchedulerOption {
+	return func(s *Scheduler) error {
+		s.statusFilePath = path
+		return nil
+	}
+}
+
+func WithPrometheusPushGateway(url string, job string) SchedulerOption {
+	return func(s *Scheduler) error {
+		s.prometheusPushGatewayUrl = url
+		s.prometheusPushGatewayJob = job
+		return nil
+	}
+}
+
+// WithMetadataFilePath sets the file path for metadata
+func WithMetadataFilePath(path string) SchedulerOption {
+	return func(s *Scheduler) error {
+		s.metadataFilePath = path
+		return nil
+	}
+}
+
+// chanRecorder records the channel to a given file path
+func chanRecorder[T *BasicTask | Status | Metadata](path string, ch <-chan T, wg *sync.WaitGroup) {
+	fd, err := openFile(path)
 	if err != nil {
-		slog.Error("error occured while serializing metadata", slog.String("error", err.Error()))
-	} else {
-		s.MetadataFd.Write(data)
-		s.MetadataFd.Write([]byte("\n"))
+		slog.Error("error occured while opening file", slog.String("path", path), slog.String("error", err.Error()))
+		return
 	}
+	go func() {
+		defer fd.Close()
+		encoder := json.NewEncoder(fd)
+		for item := range ch {
+			if err := encoder.Encode(item); err != nil {
+				slog.Error("error occured while serializing data", slog.String("path", path), slog.String("error", err.Error()))
+			}
+		}
+		wg.Done()
+	}()
+}
+
+// ResultChan returns a newly created channel to receive results
+// Everytime ResultChan is called, a new channel is created, and the results are written to all channels
+// This is useful for multiple consumers (e.g. writing to multiple files)
+func (s *Scheduler) ResultChan() <-chan *BasicTask {
+	c := make(chan *BasicTask)
+	s.resultChans = append(s.resultChans, c)
+	return c
+}
+
+// StatusChan returns a newly created channel to receive status
+// Everytime StatusChan is called, a new channel is created, and the status are written to all channels
+// This is useful for multiple consumers (e.g. writing to multiple files, report to prometheus, etc.)
+func (s *Scheduler) StatusChan() <-chan Status {
+	return s.statusManager.StatusChan()
+}
+
+func (s *Scheduler) Metadata() map[string]interface{} {
+	return s.metadata
 }
 
 // Submit submits a task to the scheduler
 func (s *Scheduler) Submit(task Task) {
-	if !s.IsStarted {
+	if !s.isStarted.Load() {
 		s.Start()
 	}
-	index := s.CurrentIndex.Load()
-	if (index % s.NumShards) == s.Shard {
+	index := s.currentIndex.Load()
+	if (index % s.numShards) == s.shard {
 		s.taskWg.Add(1)
-		s.TaskChan <- NewBasicTask(index, s.RunID, task)
+		s.taskChan <- NewBasicTask(index, s.id, task)
 	}
-	s.CurrentIndex.Add(1)
+	s.currentIndex.Add(1)
 }
 
 // Start starts the scheduler
 func (s *Scheduler) Start() *Scheduler {
-	if s.IsStarted {
-		return s
-	}
-	s.Save()
-	for i := 0; i < s.NumWorkers; i++ {
+	for i := 0; i < s.numWorkers; i++ {
 		go s.Worker()
 	}
-	go s.ResultWriter()
-	s.statusWg.Add(1)
-	go s.StatusWriter()
-	s.IsStarted = true
 	return s
 }
 
 // Wait waits for all tasks to finish
 func (s *Scheduler) Wait() {
+	// Wait for all tasks to finish
 	s.taskWg.Wait()
-	close(s.TaskChan)
-	s.logWg.Wait()
-	for _, logChan := range s.LogChans {
-		close(logChan)
+	// Close task channel
+	close(s.taskChan)
+	// Close result channels
+	for _, resultChan := range s.resultChans {
+		close(resultChan)
 	}
-	close(s.DoneChan)
-	s.statusWg.Wait()
-	s.MetadataFd.Close()
+	// Wait for all recorders to finish
+	s.statusManager.Stop()
+	// Wait for all recorders to finish
+	s.recorderWg.Wait()
 }
 
-func (s *Scheduler) Status() *Status {
-	return NewStatus(s.FailedTaskCount.Load(), s.SucceedTaskCount.Load(), s.TotalTaskCount.Load())
+func (s *Scheduler) Status() Status {
+	return s.statusManager.Snapshot()
 }
 
 // Worker is a worker
 func (s *Scheduler) Worker() {
-	for task := range s.TaskChan {
+	for task := range s.taskChan {
 		// Start task
-		for i := 0; i < s.MaxRetries; i++ {
+		for i := 0; i < s.maxRetries; i++ {
 			err := func() error {
 				task.StartedAt = time.Now().UnixMicro()
 				defer func() {
 					task.NumTries++
 					task.FinishedAt = time.Now().UnixMicro()
 				}()
-				return utils.RunWithTimeout(task.Task.Do, time.Duration(s.MaxRuntimePerTaskSeconds)*time.Second)
+				return utils.RunWithTimeout(task.Task.Do, time.Duration(s.maxRuntimePerTaskSeconds)*time.Second)
 			}()
 			if err != nil {
 				task.Error = err.Error()
@@ -272,83 +326,34 @@ func (s *Scheduler) Worker() {
 				break
 			}
 		}
-		// Serialize task
-		data, err := json.Marshal(task)
-		if err != nil {
-			slog.Error("error occured while serializing task", slog.String("error", err.Error()))
-		} else {
-			s.logWg.Add(1)
-			for _, logChan := range s.LogChans {
-				logChan <- string(data)
-			}
+		// Write log
+		for _, resultChan := range s.resultChans {
+			resultChan <- task
 		}
+		// Update status
 		if task.Error != "" {
-			s.FailedTaskCount.Add(1)
+			s.statusManager.IncFailed()
 		} else {
-			s.SucceedTaskCount.Add(1)
+			s.statusManager.IncSucceed()
 		}
 		// Notify task is done
 		s.taskWg.Done()
 	}
 }
 
-// ResultWriter writes logs to file
-func (s *Scheduler) ResultWriter() {
-	defer s.OutputFd.Close()
-	for _, logChan := range s.LogChans {
-		for result := range logChan {
-			if _, err := s.OutputFd.Write([]byte(result + "\n")); err != nil {
-				slog.Error("error occurred while writing to file", slog.String("error", err.Error()))
-				continue
-			}
-			s.logWg.Done()
-		}
-	}
-}
-
-func (s *Scheduler) StatusWriter() {
-	tick := time.NewTicker(1 * time.Second)
-	defer s.statusWg.Done()
-	defer s.StatusFd.Close()
-	defer tick.Stop()
-	for {
-		select {
-		case <-s.DoneChan:
-			s.StatusFd.Write([]byte(s.Status().String() + "\n"))
-			return
-		case <-tick.C:
-			s.StatusFd.Write([]byte(s.Status().String() + "\n"))
-		}
-	}
-}
-
-type writeCloserWrapper struct {
-	io.Writer
-}
-
-func (wc writeCloserWrapper) Close() error {
-	return nil
-}
-
-func FilePathToFd(path string) (io.WriteCloser, error) {
+func openFile(path string) (io.WriteCloser, error) {
 	switch path {
 	case "-":
-		return os.Stdout, nil
+		return utils.DiscardCloser{Writer: os.Stdout}, nil
 	case "":
-		return writeCloserWrapper{io.Discard}, nil
+		return utils.DiscardCloser{Writer: io.Discard}, nil
 	default:
-		// Create folder if not exists
+		// Create folder
 		dir := filepath.Dir(path)
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				return nil, err
-			}
-		}
-		// Open file
-		fd, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
+		if err := os.MkdirAll(dir, 0755); err != nil {
 			return nil, err
 		}
-		return fd, nil
+		// Open file
+		return os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	}
 }

@@ -85,7 +85,11 @@ func TestSharding(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		safeWriter := NewSafeWriter()
-		scheduler := gojob.NewScheduler().SetNumShards(tc.numShards).SetShard(tc.shard).SetOutputFilePath("").Start()
+		scheduler := gojob.New(
+			gojob.WithNumShards(tc.numShards),
+			gojob.WithShard(tc.shard),
+			gojob.WithResultFilePath(""),
+		).Start()
 		for i := 0; i < 16; i++ {
 			scheduler.Submit(NewTask(i, safeWriter))
 		}
