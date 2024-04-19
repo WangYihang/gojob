@@ -22,9 +22,14 @@ go.work
 
 # Example data files
 data/
+*.txt
+*.json
 
 # Goreleaser
 dist/
 
-# VSCode
+# Visual Studio Code
 .vscode/
+
+# Environment files
+.env
