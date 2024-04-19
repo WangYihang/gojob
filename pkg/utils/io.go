@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bufio"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -37,6 +38,21 @@ func Tail[T interface{}](in <-chan T, max int) <-chan T {
 			}
 		}
 		for _, line := range lines {
+			out <- line
+		}
+	}()
+	return out
+}
+
+// Skip takes a channel and returns a channel with the first n items skipped
+func Skip[T any](in <-chan T, n int) <-chan T {
+	out := make(chan T)
+	go func() {
+		defer close(out)
+		for i := 0; i < n; i++ {
+			<-in
+		}
+		for line := range in {
 			out <- line
 		}
 	}()
@@ -79,4 +95,12 @@ func Count[T any](in <-chan T) (count int64) {
 		count++
 	}
 	return count
+}
+
+type DiscardCloser struct {
+	io.Writer
+}
+
+func (wc DiscardCloser) Close() error {
+	return nil
 }
