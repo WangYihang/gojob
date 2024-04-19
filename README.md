@@ -60,14 +60,17 @@ func (t *MyTask) Do() error {
 
 func main() {
 	var numTotalTasks int64 = 256
-	scheduler := gojob.NewScheduler().
-		SetNumWorkers(8).
-		SetMaxRetries(4).
-		SetOutputFilePath("output.json").
-		SetMaxRuntimePerTaskSeconds(16).
-		SetNumShards(4).
-		SetShard(0).
-		SetTotalTasks(numTotalTasks).
+	scheduler := gojob.New(
+		gojob.WithNumWorkers(8),
+		gojob.WithMaxRetries(4),
+		gojob.WithMaxRuntimePerTaskSeconds(16),
+		gojob.WithNumShards(4),
+		gojob.WithShard(0),
+		gojob.WithTotalTasks(numTotalTasks),
+		gojob.WithStatusFilePath("status.json"),
+		gojob.WithResultFilePath("result.json"),
+		gojob.WithMetadataFilePath("metadata.json"),
+	).
 		Start()
 	for i := range numTotalTasks {
 		scheduler.Submit(New(fmt.Sprintf("https://httpbin.org/task/%d", i)))
@@ -86,7 +89,7 @@ Check [it](./examples/complex-http-crawler/) out for details.
 Try it out using the following command.
 
 ```bash
-$ go run github.com/WangYihang/gojob/examples/complex-http-crawler@latest --help                       
+$ go run github.com/WangYihang/gojob/examples/complex-http-crawler@latest --help
 Usage:
   main [OPTIONS]
 
@@ -141,5 +144,20 @@ $ tail -n 1 output.txt
         }
     },
     "error": ""
+}
+```
+
+## Integration with Prometheus
+
+gojob provides metrics (`num_total`, `num_finshed`, `num_succeed`, `num_finished`) for Prometheus. You can use the following code to expose the metrics.
+
+```go
+package main
+
+func main() {
+	scheduler := gojob.New(
+		// All you need to do is just adding the following option to the scheduler constructor
+		gojob.WithPrometheusPushGateway("http://localhost:9091", "gojob"),
+	).Start()
 }
 ```
