@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"math/rand"
 	"time"
 
@@ -26,23 +25,24 @@ func New(index int, sleepSeconds int) *MyTask {
 func (t *MyTask) Do() error {
 	time.Sleep(time.Duration(t.SleepSeconds) * time.Second)
 	if rand.Float64() < t.ErrorProbability {
-		fmt.Println(">>>", "error")
-		return errors.New("an error occurred")
+		return errors.New("an error occured")
 	}
 	return nil
 }
 
 func main() {
 	total := 256
-	scheduler := gojob.NewScheduler().
-		SetNumWorkers(8).
-		SetMaxRetries(1).
-		SetMaxRuntimePerTaskSeconds(16).
-		SetShard(0).
-		SetNumShards(1).
-		SetOutputFilePath("output.txt").
-		SetTotalTasks(int64(total)).
-		Start()
+	scheduler := gojob.New(
+		gojob.WithNumWorkers(8),
+		gojob.WithMaxRetries(1),
+		gojob.WithMaxRuntimePerTaskSeconds(16),
+		gojob.WithShard(0),
+		gojob.WithNumShards(1),
+		gojob.WithTotalTasks(int64(total)),
+		gojob.WithStatusFilePath("status.json"),
+		gojob.WithResultFilePath("result.json"),
+		gojob.WithMetadataFilePath("metadata.json"),
+	).Start()
 	for i := 0; i < total; i++ {
 		scheduler.Submit(New(i, rand.Intn(10)))
 	}

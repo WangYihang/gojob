@@ -30,14 +30,17 @@ func (t *MyTask) Do() error {
 
 func main() {
 	var numTotalTasks int64 = 256
-	scheduler := gojob.NewScheduler().
-		SetNumWorkers(8).
-		SetMaxRetries(4).
-		SetOutputFilePath("output.json").
-		SetMaxRuntimePerTaskSeconds(16).
-		SetNumShards(4).
-		SetShard(0).
-		SetTotalTasks(numTotalTasks).
+	scheduler := gojob.New(
+		gojob.WithNumWorkers(8),
+		gojob.WithMaxRetries(4),
+		gojob.WithMaxRuntimePerTaskSeconds(16),
+		gojob.WithNumShards(4),
+		gojob.WithShard(0),
+		gojob.WithTotalTasks(numTotalTasks),
+		gojob.WithStatusFilePath("status.json"),
+		gojob.WithResultFilePath("result.json"),
+		gojob.WithMetadataFilePath("metadata.json"),
+	).
 		Start()
 	for i := range numTotalTasks {
 		scheduler.Submit(New(fmt.Sprintf("https://httpbin.org/task/%d", i)))

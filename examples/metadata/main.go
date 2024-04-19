@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/WangYihang/gojob"
+	"github.com/WangYihang/gojob/pkg/runner"
 	"github.com/WangYihang/gojob/pkg/utils"
 )
 
@@ -22,17 +23,19 @@ func (t *MyTask) Do() error {
 func main() {
 	inputFilePath := "data/input.txt"
 	total := utils.Count(utils.Cat(inputFilePath))
-	scheduler := gojob.NewScheduler().
-		SetNumWorkers(8).
-		SetMaxRetries(4).
-		SetMaxRuntimePerTaskSeconds(16).
-		SetNumShards(4).
-		SetShard(0).
-		SetOutputFilePath("data/output.txt").
-		SetStatusFilePath("data/output.status").
-		SetTotalTasks(total).
-		SetMetadata("a", "b").
-		SetMetadata("c", "d").
+	scheduler := gojob.New(
+		gojob.WithNumWorkers(8),
+		gojob.WithMaxRetries(4),
+		gojob.WithMaxRuntimePerTaskSeconds(16),
+		gojob.WithNumShards(4),
+		gojob.WithShard(0),
+		gojob.WithResultFilePath("data/output.txt"),
+		gojob.WithStatusFilePath("data/output.status"),
+		gojob.WithTotalTasks(total),
+		gojob.WithMetadata("a", "b"),
+		gojob.WithMetadata("c", "d"),
+		gojob.WithMetadata("runner", runner.Runner),
+	).
 		Start()
 	for range utils.Cat(inputFilePath) {
 		scheduler.Submit(New())

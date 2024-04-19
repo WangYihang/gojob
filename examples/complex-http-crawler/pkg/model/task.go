@@ -2,6 +2,7 @@ package model
 
 import (
 	"net/http"
+	"time"
 )
 
 const MAX_TRIES = 4
@@ -26,6 +27,7 @@ func (t *MyTask) Do() error {
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
+		Timeout: 4 * time.Second,
 	}
 	req, err := http.NewRequest(http.MethodHead, t.Url, nil)
 	if err != nil {

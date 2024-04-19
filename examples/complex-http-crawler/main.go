@@ -6,6 +6,7 @@ import (
 	"github.com/WangYihang/gojob"
 	"github.com/WangYihang/gojob/examples/complex-http-crawler/pkg/model"
 	"github.com/WangYihang/gojob/pkg/utils"
+	"github.com/WangYihang/gojob/pkg/version"
 	"github.com/jessevdk/go-flags"
 )
 
@@ -17,11 +18,13 @@ type Options struct {
 	NumWorkers               int    `short:"n" long:"num-workers" description:"number of workers" default:"32"`
 	NumShards                int    `short:"s" long:"num-shards" description:"number of shards" default:"1"`
 	Shard                    int    `short:"d" long:"shard" description:"shard" default:"0"`
+	Version                  func() `long:"version" description:"print version and exit" json:"-"`
 }
 
 var opts Options
 
 func init() {
+	opts.Version = version.PrintVersion
 	_, err := flags.Parse(&opts)
 	if err != nil {
 		os.Exit(1)
@@ -30,14 +33,19 @@ func init() {
 
 func main() {
 	total := utils.Count(utils.Cat(opts.InputFilePath))
-	scheduler := gojob.NewScheduler().
-		SetNumWorkers(opts.NumWorkers).
-		SetMaxRetries(opts.MaxRetries).
-		SetMaxRuntimePerTaskSeconds(opts.MaxRuntimePerTaskSeconds).
-		SetNumShards(int64(opts.NumShards)).
-		SetShard(int64(opts.Shard)).
-		SetOutputFilePath(opts.OutputFilePath).
-		SetTotalTasks(total).
+	scheduler := gojob.New(
+		gojob.WithNumWorkers(opts.NumWorkers),
+		gojob.WithMaxRetries(opts.MaxRetries),
+		gojob.WithMaxRuntimePerTaskSeconds(opts.MaxRuntimePerTaskSeconds),
+		gojob.WithNumShards(int64(opts.NumShards)),
+		gojob.WithShard(int64(opts.Shard)),
+		gojob.WithResultFilePath(opts.OutputFilePath),
+		gojob.WithTotalTasks(total),
+		gojob.WithStatusFilePath("status.json"),
+		gojob.WithResultFilePath("result.json"),
+		gojob.WithMetadataFilePath("metadata.json"),
+		gojob.WithPrometheusPushGateway("http://localhost:9091", "gojob"),
+	).
 		Start()
 	for line := range utils.Cat(opts.InputFilePath) {
 		scheduler.Submit(model.New(string(line)))
