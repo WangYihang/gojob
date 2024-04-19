@@ -6,18 +6,18 @@ import (
 	"os"
 )
 
-type OutputCapture struct {
+type StdoutCapture struct {
 	originalStdout *os.File
 	r              *os.File
 	w              *os.File
 	buffer         bytes.Buffer
 }
 
-func NewOutputCapture() *OutputCapture {
-	return &OutputCapture{}
+func NewStdoutCapture() *StdoutCapture {
+	return &StdoutCapture{}
 }
 
-func (oc *OutputCapture) StartCapture() {
+func (oc *StdoutCapture) StartCapture() {
 	oc.originalStdout = os.Stdout
 
 	r, w, _ := os.Pipe()
@@ -27,7 +27,7 @@ func (oc *OutputCapture) StartCapture() {
 	oc.w = w
 }
 
-func (oc *OutputCapture) StopCapture() {
+func (oc *StdoutCapture) StopCapture() {
 	os.Stdout = oc.originalStdout
 	oc.w.Close()
 
@@ -35,10 +35,6 @@ func (oc *OutputCapture) StopCapture() {
 	oc.r.Close()
 }
 
-func (oc *OutputCapture) GetCapturedOutput() string {
+func (oc *StdoutCapture) GetCapturedOutput() string {
 	return oc.buffer.String()
 }
-
-// capture := util.NewOutputCapture()
-// capture.StartCapture()
-// capture.StopCapture()
