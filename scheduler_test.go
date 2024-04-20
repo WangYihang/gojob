@@ -12,41 +12,41 @@ import (
 	"github.com/WangYihang/gojob"
 )
 
-type SafeWriter struct {
+type safeWriter struct {
 	writer *strings.Builder
 	lock   sync.Mutex
 }
 
-func NewSafeWriter() *SafeWriter {
-	return &SafeWriter{
+func newSafeWriter() *safeWriter {
+	return &safeWriter{
 		writer: new(strings.Builder),
 		lock:   sync.Mutex{},
 	}
 }
 
-func (sw *SafeWriter) WriteString(s string) {
+func (sw *safeWriter) WriteString(s string) {
 	sw.lock.Lock()
 	defer sw.lock.Unlock()
 	sw.writer.WriteString(s)
 }
 
-func (sw *SafeWriter) String() string {
+func (sw *safeWriter) String() string {
 	return sw.writer.String()
 }
 
-type Task struct {
+type schedulerTestTask struct {
 	I      int
-	writer *SafeWriter
+	writer *safeWriter
 }
 
-func NewTask(i int, writer *SafeWriter) *Task {
-	return &Task{
+func newTask(i int, writer *safeWriter) *schedulerTestTask {
+	return &schedulerTestTask{
 		I:      i,
 		writer: writer,
 	}
 }
 
-func (t *Task) Do() error {
+func (t *schedulerTestTask) Do() error {
 	t.writer.WriteString(fmt.Sprintf("%d\n", t.I))
 	return nil
 }
@@ -84,14 +84,14 @@ func TestSharding(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		safeWriter := NewSafeWriter()
+		safeWriter := newSafeWriter()
 		scheduler := gojob.New(
 			gojob.WithNumShards(tc.numShards),
 			gojob.WithShard(tc.shard),
 			gojob.WithResultFilePath(""),
 		).Start()
 		for i := 0; i < 16; i++ {
-			scheduler.Submit(NewTask(i, safeWriter))
+			scheduler.Submit(newTask(i, safeWriter))
 		}
 		scheduler.Wait()
 		output := safeWriter.String()

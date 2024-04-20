@@ -13,7 +13,7 @@ type Status struct {
 	NumTotal    int64  `json:"num_total"`
 }
 
-type StatusManager struct {
+type statusManager struct {
 	numFailed  int64
 	numSucceed int64
 	numTotal   int64
@@ -23,21 +23,21 @@ type StatusManager struct {
 	statusChans []chan Status
 }
 
-func NewStatusManager() *StatusManager {
-	return &StatusManager{
+func newStatusManager() *statusManager {
+	return &statusManager{
 		mutex:       &sync.Mutex{},
 		ticker:      time.NewTicker(1 * time.Second),
 		statusChans: []chan Status{},
 	}
 }
 
-func (sm *StatusManager) Start() {
+func (sm *statusManager) Start() {
 	for range sm.ticker.C {
 		sm.notify()
 	}
 }
 
-func (sm *StatusManager) Stop() {
+func (sm *statusManager) Stop() {
 	sm.notify()
 	sm.ticker.Stop()
 	for _, ch := range sm.statusChans {
@@ -45,31 +45,31 @@ func (sm *StatusManager) Stop() {
 	}
 }
 
-func (sm *StatusManager) IncFailed() {
+func (sm *statusManager) IncFailed() {
 	sm.mutex.Lock()
 	sm.numFailed++
 	sm.mutex.Unlock()
 }
 
-func (sm *StatusManager) IncSucceed() {
+func (sm *statusManager) IncSucceed() {
 	sm.mutex.Lock()
 	sm.numSucceed++
 	sm.mutex.Unlock()
 }
 
-func (sm *StatusManager) SetTotal(total int64) {
+func (sm *statusManager) SetTotal(total int64) {
 	sm.mutex.Lock()
 	sm.numTotal = total
 	sm.mutex.Unlock()
 }
 
-func (sm *StatusManager) StatusChan() <-chan Status {
+func (sm *statusManager) StatusChan() <-chan Status {
 	ch := make(chan Status)
 	sm.statusChans = append(sm.statusChans, ch)
 	return ch
 }
 
-func (sm *StatusManager) Snapshot() Status {
+func (sm *statusManager) Snapshot() Status {
 	sm.mutex.Lock()
 	status := Status{
 		Timestamp:   time.Now().Format(time.RFC3339),
@@ -82,7 +82,7 @@ func (sm *StatusManager) Snapshot() Status {
 	return status
 }
 
-func (sm *StatusManager) notify() {
+func (sm *statusManager) notify() {
 	status := sm.Snapshot()
 	for _, ch := range sm.statusChans {
 		ch <- status
