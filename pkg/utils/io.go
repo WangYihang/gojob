@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -103,4 +104,21 @@ type DiscardCloser struct {
 
 func (wc DiscardCloser) Close() error {
 	return nil
+}
+
+func OpenFile(path string) (io.WriteCloser, error) {
+	switch path {
+	case "-":
+		return DiscardCloser{Writer: os.Stdout}, nil
+	case "":
+		return DiscardCloser{Writer: io.Discard}, nil
+	default:
+		// Create folder
+		dir := filepath.Dir(path)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return nil, err
+		}
+		// Open file
+		return os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	}
 }

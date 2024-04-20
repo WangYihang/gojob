@@ -10,7 +10,7 @@ type Task interface {
 	Do() error
 }
 
-type BasicTask struct {
+type basicTask struct {
 	Index      int64  `json:"index"`
 	RunID      string `json:"run_id"`
 	ID         string `json:"id"`
@@ -21,8 +21,8 @@ type BasicTask struct {
 	Error      string `json:"error"`
 }
 
-func NewBasicTask(index int64, runID string, task Task) *BasicTask {
-	return &BasicTask{
+func newBasicTask(index int64, runID string, task Task) *basicTask {
+	return &basicTask{
 		Index:      index,
 		RunID:      runID,
 		ID:         uuid.New().String(),

@@ -3,10 +3,7 @@ package gojob
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,13 +12,13 @@ import (
 	"github.com/google/uuid"
 )
 
-type Metadata map[string]interface{}
+type schedulerMetadata map[string]interface{}
 
 // Scheduler is a task scheduler
 type Scheduler struct {
 	id         string
 	numWorkers int
-	metadata   Metadata
+	metadata   schedulerMetadata
 
 	maxRetries               int
 	maxRuntimePerTaskSeconds int
@@ -32,10 +29,10 @@ type Scheduler struct {
 	isStarted    atomic.Bool
 	currentIndex atomic.Int64
 
-	statusManager *StatusManager
+	statusManager *statusManager
 
-	taskChan    chan *BasicTask
-	resultChans []chan *BasicTask
+	taskChan    chan *basicTask
+	resultChans []chan *basicTask
 
 	resultFilePath           string
 	statusFilePath           string
@@ -47,14 +44,14 @@ type Scheduler struct {
 	recorderWg *sync.WaitGroup
 }
 
-type SchedulerOption func(*Scheduler) error
+type schedulerOption func(*Scheduler) error
 
-func New(options ...SchedulerOption) *Scheduler {
+func New(options ...schedulerOption) *Scheduler {
 	id := uuid.New().String()
 	svr := &Scheduler{
 		id:         id,
 		numWorkers: 1,
-		metadata:   Metadata{"id": id},
+		metadata:   schedulerMetadata{"id": id},
 
 		maxRetries:               4,
 		maxRuntimePerTaskSeconds: 16,
@@ -65,10 +62,10 @@ func New(options ...SchedulerOption) *Scheduler {
 		isStarted:    atomic.Bool{},
 		currentIndex: atomic.Int64{},
 
-		statusManager: NewStatusManager(),
+		statusManager: newStatusManager(),
 
-		taskChan:    make(chan *BasicTask),
-		resultChans: []chan *BasicTask{},
+		taskChan:    make(chan *basicTask),
+		resultChans: []chan *basicTask{},
 
 		resultFilePath:   "result.json",
 		statusFilePath:   "status.json",
@@ -90,7 +87,7 @@ func New(options ...SchedulerOption) *Scheduler {
 	svr.recorderWg.Add(3)
 	chanRecorder(svr.resultFilePath, svr.ResultChan(), svr.recorderWg)
 	chanRecorder(svr.statusFilePath, svr.StatusChan(), svr.recorderWg)
-	metadataChan := make(chan Metadata)
+	metadataChan := make(chan schedulerMetadata)
 	chanRecorder(svr.metadataFilePath, metadataChan, svr.recorderWg)
 	metadataChan <- svr.metadata
 	close(metadataChan)
@@ -102,7 +99,7 @@ func New(options ...SchedulerOption) *Scheduler {
 }
 
 // SetNumShards sets the number of shards, default is 1 which means no sharding
-func WithNumShards(numShards int64) SchedulerOption {
+func WithNumShards(numShards int64) schedulerOption {
 	return func(s *Scheduler) error {
 		if numShards <= 0 {
 			return fmt.Errorf("numShards must be greater than 0")
@@ -113,7 +110,7 @@ func WithNumShards(numShards int64) SchedulerOption {
 }
 
 // SetShard sets the shard (from 0 to NumShards-1)
-func WithShard(shard int64) SchedulerOption {
+func WithShard(shard int64) schedulerOption {
 	return func(s *Scheduler) error {
 		if shard < 0 || shard >= s.numShards {
 			return fmt.Errorf("shard must be in [0, NumShards)")
@@ -124,7 +121,7 @@ func WithShard(shard int64) SchedulerOption {
 }
 
 // SetNumWorkers sets the number of workers
-func WithNumWorkers(numWorkers int) SchedulerOption {
+func WithNumWorkers(numWorkers int) schedulerOption {
 	return func(s *Scheduler) error {
 		if numWorkers <= 0 {
 			return fmt.Errorf("numWorkers must be greater than 0")
@@ -135,7 +132,7 @@ func WithNumWorkers(numWorkers int) SchedulerOption {
 }
 
 // SetMaxRetries sets the max retries
-func WithMaxRetries(maxRetries int) SchedulerOption {
+func WithMaxRetries(maxRetries int) schedulerOption {
 	return func(s *Scheduler) error {
 		if maxRetries <= 0 {
 			return fmt.Errorf("maxRetries must be greater than 0")
@@ -146,7 +143,7 @@ func WithMaxRetries(maxRetries int) SchedulerOption {
 }
 
 // SetMaxRuntimePerTaskSeconds sets the max runtime per task seconds
-func WithMaxRuntimePerTaskSeconds(maxRuntimePerTaskSeconds int) SchedulerOption {
+func WithMaxRuntimePerTaskSeconds(maxRuntimePerTaskSeconds int) schedulerOption {
 	return func(s *Scheduler) error {
 		if maxRuntimePerTaskSeconds <= 0 {
 			return fmt.Errorf("maxRuntimePerTaskSeconds must be greater than 0")
@@ -157,7 +154,7 @@ func WithMaxRuntimePerTaskSeconds(maxRuntimePerTaskSeconds int) SchedulerOption 
 }
 
 // WithTotalTasks sets the total number of tasks, and calculates the number of tasks for this shard
-func WithTotalTasks(numTotalTasks int64) SchedulerOption {
+func WithTotalTasks(numTotalTasks int64) schedulerOption {
 	return func(s *Scheduler) error {
 		// Check if NumShards is set and is greater than 0
 		if s.numShards <= 0 {
@@ -187,7 +184,7 @@ func WithTotalTasks(numTotalTasks int64) SchedulerOption {
 }
 
 // AddMetadata adds metadata
-func WithMetadata(key string, value interface{}) SchedulerOption {
+func WithMetadata(key string, value interface{}) schedulerOption {
 	return func(s *Scheduler) error {
 		s.metadata[key] = value
 		return nil
@@ -195,7 +192,7 @@ func WithMetadata(key string, value interface{}) SchedulerOption {
 }
 
 // WithResultFilePath sets the file path for results
-func WithResultFilePath(path string) SchedulerOption {
+func WithResultFilePath(path string) schedulerOption {
 	return func(s *Scheduler) error {
 		s.resultFilePath = path
 		return nil
@@ -203,14 +200,14 @@ func WithResultFilePath(path string) SchedulerOption {
 }
 
 // WithStatusFilePath sets the file path for status
-func WithStatusFilePath(path string) SchedulerOption {
+func WithStatusFilePath(path string) schedulerOption {
 	return func(s *Scheduler) error {
 		s.statusFilePath = path
 		return nil
 	}
 }
 
-func WithPrometheusPushGateway(url string, job string) SchedulerOption {
+func WithPrometheusPushGateway(url string, job string) schedulerOption {
 	return func(s *Scheduler) error {
 		s.prometheusPushGatewayUrl = url
 		s.prometheusPushGatewayJob = job
@@ -219,7 +216,7 @@ func WithPrometheusPushGateway(url string, job string) SchedulerOption {
 }
 
 // WithMetadataFilePath sets the file path for metadata
-func WithMetadataFilePath(path string) SchedulerOption {
+func WithMetadataFilePath(path string) schedulerOption {
 	return func(s *Scheduler) error {
 		s.metadataFilePath = path
 		return nil
@@ -227,8 +224,8 @@ func WithMetadataFilePath(path string) SchedulerOption {
 }
 
 // chanRecorder records the channel to a given file path
-func chanRecorder[T *BasicTask | Status | Metadata](path string, ch <-chan T, wg *sync.WaitGroup) {
-	fd, err := openFile(path)
+func chanRecorder[T *basicTask | Status | schedulerMetadata](path string, ch <-chan T, wg *sync.WaitGroup) {
+	fd, err := utils.OpenFile(path)
 	if err != nil {
 		slog.Error("error occured while opening file", slog.String("path", path), slog.String("error", err.Error()))
 		return
@@ -248,8 +245,8 @@ func chanRecorder[T *BasicTask | Status | Metadata](path string, ch <-chan T, wg
 // ResultChan returns a newly created channel to receive results
 // Everytime ResultChan is called, a new channel is created, and the results are written to all channels
 // This is useful for multiple consumers (e.g. writing to multiple files)
-func (s *Scheduler) ResultChan() <-chan *BasicTask {
-	c := make(chan *BasicTask)
+func (s *Scheduler) ResultChan() <-chan *basicTask {
+	c := make(chan *basicTask)
 	s.resultChans = append(s.resultChans, c)
 	return c
 }
@@ -273,7 +270,7 @@ func (s *Scheduler) Submit(task Task) {
 	index := s.currentIndex.Load()
 	if (index % s.numShards) == s.shard {
 		s.taskWg.Add(1)
-		s.taskChan <- NewBasicTask(index, s.id, task)
+		s.taskChan <- newBasicTask(index, s.id, task)
 	}
 	s.currentIndex.Add(1)
 }
@@ -338,22 +335,5 @@ func (s *Scheduler) Worker() {
 		}
 		// Notify task is done
 		s.taskWg.Done()
-	}
-}
-
-func openFile(path string) (io.WriteCloser, error) {
-	switch path {
-	case "-":
-		return utils.DiscardCloser{Writer: os.Stdout}, nil
-	case "":
-		return utils.DiscardCloser{Writer: io.Discard}, nil
-	default:
-		// Create folder
-		dir := filepath.Dir(path)
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return nil, err
-		}
-		// Open file
-		return os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	}
 }
