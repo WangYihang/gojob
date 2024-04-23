@@ -1,6 +1,8 @@
 package gojob
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+)
 
 // Task is an interface that defines a task
 type Task interface {
