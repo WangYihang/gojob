@@ -97,7 +97,7 @@ func NewHTTPResponse(resp *http.Response) (*HTTPResponse, error) {
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		slog.Warn("error occured while reading response body", slog.String("error", err.Error()))
+		slog.Warn("error occurred while reading response body", slog.String("error", err.Error()))
 		return httpResponse, nil
 	}
 	httpResponse.Body = body

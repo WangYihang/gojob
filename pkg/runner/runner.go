@@ -16,7 +16,7 @@ func init() {
 		Runner = NewIPInfo()
 		err := Runner.Get()
 		if err != nil {
-			slog.Error("error occured while getting runner ip info", slog.String("error", err.Error()))
+			slog.Error("error occurred while getting runner ip info", slog.String("error", err.Error()))
 			return
 		}
 	})

@@ -69,7 +69,7 @@ func prometheusPusher(url, job string, statusChan <-chan Status, wg *sync.WaitGr
 			if err := push.New(url, job).Grouping(
 				"instance", instance,
 			).Gatherer(registry).Push(); err != nil {
-				slog.Error("error occured while pushing to prometheus", slog.String("error", err.Error()))
+				slog.Error("error occurred while pushing to prometheus", slog.String("error", err.Error()))
 			}
 		}
 		wg.Done()

@@ -71,7 +71,7 @@ func Cat(filePath string) <-chan string {
 		// Open the file
 		file, err := os.Open(filePath)
 		if err != nil {
-			slog.Error("error occured while opening file", slog.String("path", filePath), slog.String("error", err.Error()))
+			slog.Error("error occurred while opening file", slog.String("path", filePath), slog.String("error", err.Error()))
 			return // Close the channel and exit the goroutine
 		}
 		defer file.Close()
@@ -83,7 +83,7 @@ func Cat(filePath string) <-chan string {
 
 		// Check for errors during Scan, excluding EOF
 		if err := scanner.Err(); err != nil {
-			slog.Error("error occured while reading file", slog.String("path", filePath), slog.String("error", err.Error()))
+			slog.Error("error occurred while reading file", slog.String("path", filePath), slog.String("error", err.Error()))
 		}
 	}()
 

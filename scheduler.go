@@ -227,7 +227,7 @@ func WithMetadataFilePath(path string) schedulerOption {
 func chanRecorder[T *basicTask | Status | schedulerMetadata](path string, ch <-chan T, wg *sync.WaitGroup) {
 	fd, err := utils.OpenFile(path)
 	if err != nil {
-		slog.Error("error occured while opening file", slog.String("path", path), slog.String("error", err.Error()))
+		slog.Error("error occurred while opening file", slog.String("path", path), slog.String("error", err.Error()))
 		return
 	}
 	go func() {
@@ -235,7 +235,7 @@ func chanRecorder[T *basicTask | Status | schedulerMetadata](path string, ch <-c
 		encoder := json.NewEncoder(fd)
 		for item := range ch {
 			if err := encoder.Encode(item); err != nil {
-				slog.Error("error occured while serializing data", slog.String("path", path), slog.String("error", err.Error()))
+				slog.Error("error occurred while serializing data", slog.String("path", path), slog.String("error", err.Error()))
 			}
 		}
 		wg.Done()
