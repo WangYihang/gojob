@@ -2,6 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/WangYihang/gojob.svg)](https://pkg.go.dev/github.com/WangYihang/gojob)
 [![Go Report Card](https://goreportcard.com/badge/github.com/WangYihang/gojob)](https://goreportcard.com/report/github.com/WangYihang/gojob)
+[![codecov](https://codecov.io/gh/WangYihang/gojob/graph/badge.svg?token=FG1HT7FCKG)](https://codecov.io/gh/WangYihang/gojob)
 
 gojob is a simple job scheduler.
 
@@ -161,3 +162,7 @@ func main() {
 	).Start()
 }
 ```
+
+## Coverage
+
+![codecov-graph](https://codecov.io/gh/WangYihang/gojob/graphs/tree.svg?token=FG1HT7FCKG)
