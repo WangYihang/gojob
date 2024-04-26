@@ -165,4 +165,4 @@ func main() {
 
 ## Coverage
 
-![codecov-graph](https://codecov.io/gh/WangYihang/gojob/graphs/tree.svg?token=FG1HT7FCKG)
+[![codecov-graph](https://codecov.io/gh/WangYihang/gojob/graphs/tree.svg?token=FG1HT7FCKG)](https://codecov.io/gh/WangYihang/gojob)
