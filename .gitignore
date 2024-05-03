@@ -36,3 +36,6 @@ dist/
 
 # Profile
 *.prof
+
+# Trace file
+*.trace
