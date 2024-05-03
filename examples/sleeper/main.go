@@ -37,7 +37,6 @@ func main() {
 		gojob.WithResultFilePath("-"),
 		gojob.WithMetadataFilePath("-"),
 	).Start()
-
 	for i := 0; i < total; i++ {
 		scheduler.Submit(New(i, rand.Intn(10)))
 	}
