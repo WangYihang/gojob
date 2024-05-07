@@ -280,6 +280,7 @@ func (s *Scheduler) Start() *Scheduler {
 	for i := 0; i < s.numWorkers; i++ {
 		go s.Worker()
 	}
+	s.isStarted.Store(true)
 	return s
 }
 
