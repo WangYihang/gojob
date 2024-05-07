@@ -4,8 +4,6 @@ services:
     image: prom/prometheus
     container_name: prometheus
     restart: unless-stopped
-    ports:
-      - 19090:9090
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
     volumes:
@@ -17,20 +15,19 @@ services:
     container_name: pushgateway
     restart: unless-stopped
     ports:
-      - 19091:9091
+      - 9091:9091
 
   grafana:
     image: grafana/grafana
     container_name: grafana
     ports:
-      - 13000:3000
+      - 3000:3000
     environment:
       - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=${GF_USERS_ALLOW_SIGN_UP:-false}
     restart: unless-stopped
     volumes:
-      - ./deploy/grafana_config/provisioning/datasources:/etc/grafana/provisioning/datasources
       - grafana_data:/var/lib/grafana
 
 volumes:
