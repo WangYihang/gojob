@@ -9,6 +9,7 @@ import (
 	"github.com/WangYihang/gojob/pkg/runner"
 	"github.com/WangYihang/gojob/pkg/version"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/push"
 )
 
@@ -46,6 +47,10 @@ var (
 func prometheusPusher(url, job string, statusChan <-chan Status, wg *sync.WaitGroup) {
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(numTotal, numFailed, numSucceed, numFinished)
+	registry.MustRegister(
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+	)
 	instance := fmt.Sprintf(
 		"gojob-%s-%s-%s",
 		version.Version,
