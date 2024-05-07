@@ -81,7 +81,6 @@ func prometheusPusher(url, job string, statusChan <-chan Status, wg *sync.WaitGr
 		runner.Runner.IP,
 	)
 	registry := NewRegistryWithLabels(map[string]string{
-		"instance":             instance,
 		"gojob_version":        version.Version,
 		"gojob_runner_ip":      runner.Runner.IP,
 		"gojob_runner_country": runner.Runner.Country,
@@ -100,7 +99,9 @@ func prometheusPusher(url, job string, statusChan <-chan Status, wg *sync.WaitGr
 			numFailed.Set(float64(status.NumFailed))
 			numSucceed.Set(float64(status.NumSucceed))
 			numFinished.Set(float64(status.NumFinished))
-			if err := push.New(url, job).Gatherer(registry).Push(); err != nil {
+			if err := push.New(url, job).Grouping(
+				"instance", instance,
+			).Gatherer(registry).Push(); err != nil {
 				slog.Error("error occurred while pushing to prometheus", slog.String("error", err.Error()))
 			}
 		}
