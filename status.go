@@ -27,7 +27,7 @@ type statusManager struct {
 func newStatusManager() *statusManager {
 	return &statusManager{
 		mutex:       &sync.Mutex{},
-		ticker:      time.NewTicker(1 * time.Second),
+		ticker:      time.NewTicker(5 * time.Second),
 		statusChans: []chan Status{},
 	}
 }
