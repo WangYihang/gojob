@@ -79,12 +79,12 @@ func prometheusPusher(url, job string, statusChan <-chan Status, wg *sync.WaitGr
 		runner.Runner.IP,
 	)
 	registry := NewRegistryWithLabels(map[string]string{
+		"instance":             instance,
 		"gojob_version":        version.Version,
 		"gojob_runner_ip":      runner.Runner.IP,
 		"gojob_runner_country": runner.Runner.Country,
 		"gojob_runner_region":  runner.Runner.Region,
 		"gojob_runner_city":    runner.Runner.City,
-		"gojob_instance":       instance,
 	})
 	registry.MustRegister(numTotal, numFailed, numSucceed, numFinished)
 	registry.MustRegister(
