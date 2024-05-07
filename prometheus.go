@@ -3,10 +3,10 @@ package gojob
 import (
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 
 	"github.com/WangYihang/gojob/pkg/runner"
+	"github.com/WangYihang/gojob/pkg/utils"
 	"github.com/WangYihang/gojob/pkg/version"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -71,11 +71,13 @@ func (g *customMetricsRegistry) Gather() ([]*io_prometheus_client.MetricFamily, 
 
 	return metricFamilies, err
 }
+
 func prometheusPusher(url, job string, statusChan <-chan Status, wg *sync.WaitGroup) {
 	instance := fmt.Sprintf(
-		"gojob-%s-%s-%s",
+		"gojob-%s-%s-%s-%s",
 		version.Version,
-		strings.ToLower(runner.Runner.Country),
+		utils.Sanitize(runner.Runner.Country),
+		utils.Sanitize(runner.Runner.City),
 		runner.Runner.IP,
 	)
 	registry := NewRegistryWithLabels(map[string]string{
