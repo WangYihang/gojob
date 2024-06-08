@@ -12,6 +12,8 @@ func RunWithTimeout(f func() error, timeout time.Duration) error {
 	done := make(chan error, 1)
 
 	go func() {
+		defer close(done)
+
 		done <- f()
 	}()
 
