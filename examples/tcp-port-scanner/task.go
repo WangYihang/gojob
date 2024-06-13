@@ -1,6 +1,9 @@
 package main
 
-import "net"
+import (
+	"context"
+	"net"
+)
 
 type MyTask struct {
 	IP     string `json:"ip"`
@@ -16,7 +19,7 @@ func New(ip string, port uint16) *MyTask {
 	}
 }
 
-func (t *MyTask) Do() error {
+func (t *MyTask) Do(_ context.Context) error {
 	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
 		IP:   net.ParseIP(t.IP),
 		Port: int(t.Port),

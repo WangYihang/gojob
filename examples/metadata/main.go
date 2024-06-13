@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"math/rand"
 	"time"
 
@@ -15,7 +16,7 @@ func New() *MyTask {
 	return &MyTask{}
 }
 
-func (t *MyTask) Do() error {
+func (t *MyTask) Do(_ context.Context) error {
 	time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
 	return nil
 }
