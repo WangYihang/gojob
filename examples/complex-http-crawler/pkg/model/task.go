@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"net/http"
 	"time"
 )
@@ -18,7 +19,7 @@ func New(url string) *MyTask {
 	}
 }
 
-func (t *MyTask) Do() error {
+func (t *MyTask) Do(_ context.Context) error {
 	transport := &http.Transport{
 		DisableCompression: true,
 	}

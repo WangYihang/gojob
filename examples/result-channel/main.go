@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -20,7 +21,7 @@ func New(url string) *MyTask {
 	}
 }
 
-func (t *MyTask) Do() error {
+func (t *MyTask) Do(_ context.Context) error {
 	response, err := http.Get(t.Url)
 	if err != nil {
 		return err

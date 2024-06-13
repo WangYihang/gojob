@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"math/rand"
 	"time"
@@ -22,7 +23,7 @@ func New(index int, sleepSeconds int) *MyTask {
 	}
 }
 
-func (t *MyTask) Do() error {
+func (t *MyTask) Do(_ context.Context) error {
 	time.Sleep(time.Duration(t.SleepSeconds) * time.Second)
 	if rand.Float64() < t.ErrorProbability {
 		return errors.New("an error occurred")
