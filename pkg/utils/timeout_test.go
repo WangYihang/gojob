@@ -1,6 +1,7 @@
 package utils_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -8,7 +9,7 @@ import (
 )
 
 func TestRunWithTimeout(t *testing.T) {
-	task := func() error {
+	task := func(_ context.Context) error {
 		time.Sleep(2 * time.Second)
 		return nil
 	}

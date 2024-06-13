@@ -1,6 +1,7 @@
 package gojob_test
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -46,7 +47,7 @@ func newTask(i int, writer *safeWriter) *schedulerTestTask {
 	}
 }
 
-func (t *schedulerTestTask) Do() error {
+func (t *schedulerTestTask) Do(_ context.Context) error {
 	t.writer.WriteString(fmt.Sprintf("%d\n", t.I))
 	return nil
 }
