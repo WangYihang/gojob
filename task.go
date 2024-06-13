@@ -1,6 +1,8 @@
 package gojob
 
 import (
+	"context"
+
 	"github.com/google/uuid"
 )
 
@@ -9,7 +11,7 @@ type Task interface {
 	// Do starts the task, returns error if failed
 	// If an error is returned, the task will be retried until MaxRetries
 	// You can set MaxRetries by calling SetMaxRetries on the scheduler
-	Do() error
+	Do(context.Context) error
 }
 
 type basicTask struct {

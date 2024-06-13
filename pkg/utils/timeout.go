@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func RunWithTimeout(f func() error, timeout time.Duration) error {
+func RunWithTimeout(f func(ctx context.Context) error, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -14,7 +14,7 @@ func RunWithTimeout(f func() error, timeout time.Duration) error {
 	go func() {
 		defer close(done)
 
-		done <- f()
+		done <- f(ctx)
 	}()
 
 	select {
