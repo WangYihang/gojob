@@ -98,20 +98,21 @@ func Count[T any](in <-chan T) (count int64) {
 	return count
 }
 
-type DiscardCloser struct {
+type ReadDiscardCloser struct {
 	io.Writer
+	io.Reader
 }
 
-func (wc DiscardCloser) Close() error {
+func (wc ReadDiscardCloser) Close() error {
 	return nil
 }
 
 func OpenFile(path string) (io.WriteCloser, error) {
 	switch path {
 	case "-":
-		return DiscardCloser{Writer: os.Stdout}, nil
+		return ReadDiscardCloser{Writer: os.Stdout, Reader: os.Stdin}, nil
 	case "":
-		return DiscardCloser{Writer: io.Discard}, nil
+		return ReadDiscardCloser{Writer: io.Discard}, nil
 	default:
 		// Create folder
 		dir := filepath.Dir(path)
