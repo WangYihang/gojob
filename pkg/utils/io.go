@@ -120,6 +120,6 @@ func OpenFile(path string) (io.WriteCloser, error) {
 			return nil, err
 		}
 		// Open file
-		return os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		return os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	}
 }
