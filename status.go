@@ -42,6 +42,7 @@ func (sm *statusManager) notify() {
 // Start starts the status manager.
 // It will notify all the status channels every second.
 func (sm *statusManager) Start() {
+	sm.notify()
 	for range sm.ticker.C {
 		sm.notify()
 	}
