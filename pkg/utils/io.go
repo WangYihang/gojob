@@ -69,14 +69,14 @@ func Cat(filePath string) <-chan string {
 		defer close(out) // Ensure the channel is closed when the goroutine finishes
 
 		// Open the file
-		file, err := os.Open(filePath)
+		file, err := OpenFile(filePath)
 		if err != nil {
 			slog.Error("error occurred while opening file", slog.String("path", filePath), slog.String("error", err.Error()))
 			return // Close the channel and exit the goroutine
 		}
 		defer file.Close()
 
-		scanner := bufio.NewScanner(file)
+		scanner := bufio.NewScanner(file.(io.Reader)) // Change the type of file to io.Reader
 		for scanner.Scan() {
 			out <- strings.TrimSpace(scanner.Text()) // Send the line to the channel
 		}
