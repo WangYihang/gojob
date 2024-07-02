@@ -57,6 +57,7 @@ func (sm *statusManager) Start() {
 // Stop stops the status manager.
 func (sm *statusManager) Stop() {
 	sm.notify()
+	sm.notify()
 	sm.ticker.Stop()
 	for _, ch := range sm.statusChans {
 		close(ch)
