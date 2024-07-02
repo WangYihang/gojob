@@ -270,7 +270,7 @@ func (s *Scheduler) Submit(task Task) {
 	index := s.currentIndex.Load()
 	if (index % s.numShards) == s.shard {
 		s.taskWg.Add(1)
-		s.taskChan <- newBasicTask(index, s.id, task)
+		s.taskChan <- newBasicTask(index, task)
 	}
 	s.currentIndex.Add(1)
 }

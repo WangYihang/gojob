@@ -108,6 +108,10 @@ func (wc ReadDiscardCloser) Close() error {
 }
 
 func OpenFile(path string) (io.WriteCloser, error) {
+	return OpenLocalFile(path)
+}
+
+func OpenLocalFile(path string) (io.WriteCloser, error) {
 	switch path {
 	case "-":
 		return ReadDiscardCloser{Writer: os.Stdout, Reader: os.Stdin}, nil
