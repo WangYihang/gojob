@@ -10,7 +10,6 @@ func main() {
 	for line := range utils.Cat(
 		"s3://example/shakespeare.txt" +
 			"?region=us-west-1" +
-			"&bucket=default" +
 			"&access_key=********************" +
 			"&secret_key=********************************************",
 	) {
