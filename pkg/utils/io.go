@@ -2,11 +2,17 @@ package utils
 
 import (
 	"bufio"
+	"context"
+	"fmt"
 	"io"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 // Head takes a channel and returns a channel with the first n items
@@ -108,7 +114,78 @@ func (wc ReadDiscardCloser) Close() error {
 }
 
 func OpenFile(path string) (io.WriteCloser, error) {
-	return OpenLocalFile(path)
+	protocol, err := ParseProtocol(path)
+	if err != nil {
+		return nil, err
+	}
+	switch protocol {
+	case "s3":
+		slog.Info("opening s3 file", slog.String("path", path))
+		return OpenS3File(path)
+	case "file":
+		slog.Info("opening local file", slog.String("path", path))
+		return OpenLocalFile(path)
+	default:
+		slog.Warn("unsupported protocol", slog.String("protocol", protocol))
+		return nil, fmt.Errorf("unsupported protocol: %s", protocol)
+	}
+}
+
+// OpenS3File opens a file from S3
+// e.g. s3://default/data.json?region=us-west-1&endpoint=s3.amazonaws.com&access_key=********************&secret_key=****************************************
+func OpenS3File(path string) (io.WriteCloser, error) {
+	// Parse the path
+	parsed, _ := url.Parse(path)
+	bucketName := parsed.Host
+	objectKey := strings.TrimLeft(parsed.Path, "/")
+	query := parsed.Query()
+	endpoint := query.Get("endpoint")
+	if endpoint == "" {
+		endpoint = "s3.amazonaws.com"
+	}
+	accessKey := query.Get("access_key")
+	secretKey := query.Get("secret_key")
+	region := query.Get("region")
+	slog.Info(
+		"parsed s3 path",
+		slog.String("access_key", accessKey),
+		slog.String("secret_key", secretKey),
+		slog.String("bucket", bucketName),
+		slog.String("object", objectKey),
+		slog.String("endpoint", endpoint),
+		slog.String("region", region),
+	)
+
+	// Download file from S3 into a temporary file
+	slog.Info("downloading file from s3", slog.String("bucket", bucketName), slog.String("object", objectKey))
+	s3Client, err := minio.New(endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
+		Secure: true,
+		Region: region,
+	})
+	if err != nil {
+		return nil, err
+	}
+	reader, err := s3Client.GetObject(context.Background(), bucketName, objectKey, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	fd, err := os.CreateTemp("", "gojob-*")
+	if err != nil {
+		return nil, err
+	}
+	defer fd.Close()
+
+	_, err = io.Copy(fd, reader)
+	if err != nil {
+		return nil, err
+	}
+
+	// Open the temporary file
+	slog.Info("opening local file", slog.String("path", fd.Name()))
+	return OpenLocalFile(fd.Name())
 }
 
 func OpenLocalFile(path string) (io.WriteCloser, error) {
