@@ -28,8 +28,9 @@ func main() {
 		gojob.WithMaxRuntimePerTaskSeconds(16),
 		gojob.WithNumShards(4),
 		gojob.WithShard(0),
-		gojob.WithResultFilePath("data/output.txt"),
-		gojob.WithStatusFilePath("data/output.status"),
+		gojob.WithResultFilePath("data/output.json"),
+		gojob.WithStatusFilePath("data/status.json"),
+		gojob.WithMetadataFilePath("data/metadata.json"),
 		gojob.WithTotalTasks(total),
 	).
 		Start()
