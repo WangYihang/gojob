@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bufio"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -188,11 +189,12 @@ func OpenS3File(path string) (io.WriteCloser, error) {
 	return OpenLocalFile(fd.Name())
 }
 
-func OpenLocalFile(path string) (io.WriteCloser, error) {
+func OpenLocalFile(path string) (io.ReadWriteCloser, error) {
 	switch path {
 	case "-":
 		return ReadDiscardCloser{Writer: os.Stdout, Reader: os.Stdin}, nil
 	case "":
+		// bug: input file can not be empty
 		return ReadDiscardCloser{Writer: io.Discard}, nil
 	default:
 		// Create folder
@@ -201,6 +203,16 @@ func OpenLocalFile(path string) (io.WriteCloser, error) {
 			return nil, err
 		}
 		// Open file
-		return os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+		// Check the file extension, if it is .gz, use gzip.NewReadWriter
+		fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+		if strings.HasSuffix(path, ".gz") {
+			gzipFd, err := gzip.NewReader(fd)
+			if err != nil {
+				return nil, err
+			}
+			return ReadDiscardCloser{Writer: io.Discard, Reader: gzipFd}, nil
+		} else {
+			return fd, err
+		}
 	}
 }
