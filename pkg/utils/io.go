@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/WangYihang/uio"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
@@ -76,7 +77,7 @@ func Cat(filePath string) <-chan string {
 		defer close(out) // Ensure the channel is closed when the goroutine finishes
 
 		// Open the file
-		file, err := OpenFile(filePath)
+		file, err := uio.Open(filePath)
 		if err != nil {
 			slog.Error("error occurred while opening file", slog.String("path", filePath), slog.String("error", err.Error()))
 			return // Close the channel and exit the goroutine
