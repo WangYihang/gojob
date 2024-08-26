@@ -10,6 +10,8 @@ github.com/WangYihang/uio v0.0.0-20240823113922-10bd9224d4c1 h1:zKWH0lwVIssDDYd8
 github.com/WangYihang/uio v0.0.0-20240823113922-10bd9224d4c1/go.mod h1:0AO9XwgENfIEpS5lo7doL3CxIRXK1LkgLasTEl6xAG4=
 github.com/WangYihang/uio v0.0.0-20240823114425-34e6b93251cd h1:1e3rdqd+Rlf5rMznGmV3zxmQmXAmSWfEUaS+H/li3p8=
 github.com/WangYihang/uio v0.0.0-20240823114425-34e6b93251cd/go.mod h1:0AO9XwgENfIEpS5lo7doL3CxIRXK1LkgLasTEl6xAG4=
+github.com/WangYihang/uio v0.0.0-20240826152024-f144bed245c7 h1:hcqowlVNExdNjr3M6yMR778GQJoVs6dxy/dybJBzF9o=
+github.com/WangYihang/uio v0.0.0-20240826152024-f144bed245c7/go.mod h1:0AO9XwgENfIEpS5lo7doL3CxIRXK1LkgLasTEl6xAG4=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/cespare/xxhash/v2 v2.2.0 h1:DC2CZ1Ep5Y4k3ZQ899DldepgrayRUGE6BBZ/cd9Cj44=
