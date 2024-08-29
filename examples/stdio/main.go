@@ -1,21 +1,24 @@
 package main
 
 import (
-	"math/rand"
-	"time"
+	"fmt"
 
 	"github.com/WangYihang/gojob"
 	"github.com/WangYihang/gojob/pkg/utils"
 )
 
-type MyTask struct{}
-
-func New() *MyTask {
-	return &MyTask{}
+type MyPrinterTask struct {
+	line string
 }
 
-func (t *MyTask) Do() error {
-	time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
+func New(line string) *MyPrinterTask {
+	return &MyPrinterTask{
+		line: line,
+	}
+}
+
+func (t *MyPrinterTask) Do() error {
+	fmt.Println(t.line)
 	return nil
 }
 
@@ -24,14 +27,12 @@ func main() {
 		gojob.WithNumWorkers(8),
 		gojob.WithMaxRetries(4),
 		gojob.WithMaxRuntimePerTaskSeconds(16),
-		gojob.WithNumShards(4),
-		gojob.WithShard(0),
 		gojob.WithResultFilePath("-"),
 		gojob.WithStatusFilePath("status.json"),
 	).
 		Start()
-	for range utils.Cat("-") {
-		scheduler.Submit(New())
+	for line := range utils.Cat("-") {
+		scheduler.Submit(New(line))
 	}
 	scheduler.Wait()
 }

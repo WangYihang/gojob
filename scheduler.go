@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/WangYihang/gojob/pkg/utils"
+	"github.com/WangYihang/uio"
 	"github.com/google/uuid"
 )
 
@@ -225,7 +226,7 @@ func WithMetadataFilePath(path string) schedulerOption {
 
 // chanRecorder records the channel to a given file path
 func chanRecorder[T *basicTask | Status | schedulerMetadata](path string, ch <-chan T, wg *sync.WaitGroup) {
-	fd, err := utils.OpenFile(path)
+	fd, err := uio.Open(path)
 	if err != nil {
 		slog.Error("error occurred while opening file", slog.String("path", path), slog.String("error", err.Error()))
 		return
