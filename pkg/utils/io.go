@@ -78,9 +78,7 @@ func Cat(filePath string) <-chan string {
 
 		scanner := bufio.NewScanner(file.(io.Reader)) // Change the type of file to io.Reader
 		for scanner.Scan() {
-			line := scanner.Text()
-			slog.Info("reading line", slog.String("line", line))
-			out <- strings.TrimSpace(line) // Send the line to the channel
+			out <- strings.TrimSpace(scanner.Text()) // Send the line to the channel
 		}
 
 		// Check for errors during Scan, excluding EOF
