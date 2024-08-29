@@ -12,8 +12,12 @@ github.com/WangYihang/uio v0.0.0-20240823114425-34e6b93251cd h1:1e3rdqd+Rlf5rMzn
 github.com/WangYihang/uio v0.0.0-20240823114425-34e6b93251cd/go.mod h1:0AO9XwgENfIEpS5lo7doL3CxIRXK1LkgLasTEl6xAG4=
 github.com/WangYihang/uio v0.0.0-20240826152024-f144bed245c7 h1:hcqowlVNExdNjr3M6yMR778GQJoVs6dxy/dybJBzF9o=
 github.com/WangYihang/uio v0.0.0-20240826152024-f144bed245c7/go.mod h1:0AO9XwgENfIEpS5lo7doL3CxIRXK1LkgLasTEl6xAG4=
+github.com/WangYihang/uio v0.0.0-20240829150037-ce8fff04fa48 h1:PUBSQ5ANsRjj6g0jYPKVIo5m50iTS6gxY6TfCl29Rhk=
+github.com/WangYihang/uio v0.0.0-20240829150037-ce8fff04fa48/go.mod h1:T4KtUOTAaSgFJNlU8mEMi5tPSUM1P8Fe1SrjMUwbxZ4=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
+github.com/caarlos0/env v3.5.0+incompatible h1:Yy0UN8o9Wtr/jGHZDpCBLpNrzcFLLM2yixi/rBrKyJs=
+github.com/caarlos0/env v3.5.0+incompatible/go.mod h1:tdCsowwCzMLdkqRYDlHpZCp2UooDD3MspDBjZ2AD02Y=
 github.com/cespare/xxhash/v2 v2.2.0 h1:DC2CZ1Ep5Y4k3ZQ899DldepgrayRUGE6BBZ/cd9Cj44=
 github.com/cespare/xxhash/v2 v2.2.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

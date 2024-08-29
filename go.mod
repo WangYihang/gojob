@@ -3,7 +3,7 @@ module github.com/WangYihang/gojob
 go 1.22.6
 
 require (
-	github.com/WangYihang/uio v0.0.0-20240826152024-f144bed245c7
+	github.com/WangYihang/uio v0.0.0-20240829150037-ce8fff04fa48
 	github.com/google/uuid v1.6.0
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/minio/minio-go/v7 v7.0.75
@@ -13,6 +13,7 @@ require (
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/caarlos0/env v3.5.0+incompatible // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
