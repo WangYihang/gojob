@@ -232,13 +232,13 @@ func chanRecorder[T *basicTask | Status | schedulerMetadata](path string, ch <-c
 		return
 	}
 	go func() {
-		defer fd.Close()
 		encoder := json.NewEncoder(fd)
 		for item := range ch {
 			if err := encoder.Encode(item); err != nil {
 				slog.Error("error occurred while serializing data", slog.String("path", path), slog.String("error", err.Error()))
 			}
 		}
+		fd.Close()
 		wg.Done()
 	}()
 }
