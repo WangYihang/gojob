@@ -3,7 +3,7 @@ module github.com/WangYihang/gojob
 go 1.22.6
 
 require (
-	github.com/WangYihang/uio v0.0.0-20240829150037-ce8fff04fa48
+	github.com/WangYihang/uio v0.0.0-20240905152743-19ba2df5e6a6
 	github.com/google/uuid v1.6.0
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/prometheus/client_golang v1.19.0

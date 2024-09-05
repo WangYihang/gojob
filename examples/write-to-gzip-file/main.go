@@ -1,11 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 
 	"github.com/WangYihang/gojob"
-	"github.com/WangYihang/gojob/pkg/utils"
 )
 
 type MyTask struct {
@@ -20,20 +20,22 @@ func New(line string) *MyTask {
 
 func (t *MyTask) Do() error {
 	time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
+	fmt.Println(t.Line)
 	return nil
 }
 
 func main() {
 	scheduler := gojob.New(
-		gojob.WithNumWorkers(8),
+		gojob.WithNumWorkers(1),
 		gojob.WithMaxRetries(4),
 		gojob.WithMaxRuntimePerTaskSeconds(16),
-		gojob.WithResultFilePath("-"),
+		gojob.WithResultFilePath("result.txt.gz"),
 		gojob.WithStatusFilePath("status.json"),
+		gojob.WithMetadataFilePath("status.json"),
 	).
 		Start()
-	for line := range utils.Cat("data.txt.gz") {
-		scheduler.Submit(New(line))
+	for line := range 16 {
+		scheduler.Submit(New(fmt.Sprintf("line-%d", line)))
 	}
 	scheduler.Wait()
 }
