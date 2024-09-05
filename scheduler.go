@@ -85,9 +85,10 @@ func New(options ...schedulerOption) *Scheduler {
 		}
 	}
 	go svr.statusManager.Start()
-	svr.recorderWg.Add(3)
+	svr.recorderWg.Add(4)
 	chanRecorder(svr.resultFilePath, svr.ResultChan(), svr.recorderWg)
 	chanRecorder(svr.statusFilePath, svr.StatusChan(), svr.recorderWg)
+	chanRecorder("-", svr.StatusChan(), svr.recorderWg)
 	metadataChan := make(chan schedulerMetadata)
 	chanRecorder(svr.metadataFilePath, metadataChan, svr.recorderWg)
 	metadataChan <- svr.metadata
