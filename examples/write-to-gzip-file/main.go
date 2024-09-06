@@ -31,7 +31,7 @@ func main() {
 		gojob.WithMaxRuntimePerTaskSeconds(16),
 		gojob.WithResultFilePath("result.txt.gz"),
 		gojob.WithStatusFilePath("status.json"),
-		gojob.WithMetadataFilePath("status.json"),
+		gojob.WithMetadataFilePath("metadata.json"),
 	).
 		Start()
 	for line := range 16 {
