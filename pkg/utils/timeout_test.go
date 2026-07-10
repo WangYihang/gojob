@@ -8,18 +8,22 @@ import (
 	"github.com/WangYihang/gojob/pkg/utils"
 )
 
-type Task struct {
-	ctx context.Context
-}
+type Task struct{}
 
-func (t *Task) Do() error {
-	time.Sleep(16 * time.Second)
-	return nil
+func (t *Task) Do(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(16 * time.Second):
+		return nil
+	}
 }
 
 func TestRunWithTimeout(t *testing.T) {
-	task := &Task{context.Background()}
-	err := utils.RunWithTimeout(task.Do, 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	task := &Task{}
+	err := utils.RunWithTimeout(ctx, task.Do)
 	if err == nil {
 		t.Errorf("Expected timeout error, got nil")
 	}

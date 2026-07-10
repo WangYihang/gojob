@@ -20,10 +20,13 @@ Create a job scheduler with a worker pool of size 32. To do this, you need to im
 ```go
 // Task is an interface that defines a task
 type Task interface {
-	// Do starts the task, returns error if failed
-	// If an error is returned, the task will be retried until MaxRetries
-	// You can set MaxRetries by calling SetMaxRetries on the scheduler
-	Do() error
+	// Do starts the task, returns error if failed.
+	// If an error is returned, the task will be retried until MaxRetries is reached.
+	// You can set MaxRetries by calling WithMaxRetries on the scheduler.
+	//
+	// The context is cancelled when the task exceeds its configured max runtime,
+	// so honor it (e.g. http.NewRequestWithContext) to support cancellation.
+	Do(ctx context.Context) error
 }
 ```
 
@@ -33,6 +36,7 @@ The whole [code](./examples/simple-http-crawler/main.go) looks like this (try it
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -50,13 +54,17 @@ func New(url string) *MyTask {
 	}
 }
 
-func (t *MyTask) Do() error {
-	response, err := http.Get(t.Url)
+func (t *MyTask) Do(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, t.Url, nil)
 	if err != nil {
 		return err
 	}
-	t.StatusCode = response.StatusCode
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
 	defer response.Body.Close()
+	t.StatusCode = response.StatusCode
 	return nil
 }
 
@@ -151,7 +159,7 @@ $ tail -n 1 output.txt
 
 ## Integration with Prometheus
 
-gojob provides metrics (`num_total`, `num_finshed`, `num_succeed`, `num_finished`) for Prometheus. You can use the following code to expose the metrics.
+gojob provides metrics (`num_total`, `num_failed`, `num_succeed`, `num_finished`) for Prometheus. You can use the following code to expose the metrics.
 
 ```go
 package main

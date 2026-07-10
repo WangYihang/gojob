@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"time"
@@ -18,8 +19,12 @@ func New(line string) *MyTask {
 	}
 }
 
-func (t *MyTask) Do() error {
-	time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
+func (t *MyTask) Do(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(time.Duration(rand.Intn(1000)) * time.Millisecond):
+	}
 	fmt.Println(t.Line)
 	return nil
 }

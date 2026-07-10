@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -18,13 +19,17 @@ func New(url string) *MyTask {
 	}
 }
 
-func (t *MyTask) Do() error {
-	response, err := http.Get(t.Url)
+func (t *MyTask) Do(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, t.Url, nil)
 	if err != nil {
 		return err
 	}
-	t.StatusCode = response.StatusCode
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
 	defer response.Body.Close()
+	t.StatusCode = response.StatusCode
 	return nil
 }
 

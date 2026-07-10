@@ -14,33 +14,6 @@ import (
 	io_prometheus_client "github.com/prometheus/client_model/go"
 )
 
-var (
-	numTotal = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "num_total",
-			Help: "Total number of processed events",
-		},
-	)
-	numFailed = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "num_failed",
-			Help: "Total number of failed events",
-		},
-	)
-	numSucceed = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "num_succeed",
-			Help: "Total number of succeeded events",
-		},
-	)
-	numFinished = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "num_finished",
-			Help: "Total number of finished events",
-		},
-	)
-)
-
 type customMetricsRegistry struct {
 	*prometheus.Registry
 	customLabels []*io_prometheus_client.LabelPair
@@ -51,9 +24,12 @@ func NewRegistryWithLabels(labels map[string]string) *customMetricsRegistry {
 		Registry: prometheus.NewRegistry(),
 	}
 	for k, v := range labels {
+		// Bind fresh variables so every LabelPair points at its own name/value
+		// rather than at the shared range variables.
+		name, value := k, v
 		c.customLabels = append(c.customLabels, &io_prometheus_client.LabelPair{
-			Name:  &k,
-			Value: &v,
+			Name:  &name,
+			Value: &value,
 		})
 	}
 	return c
@@ -73,19 +49,40 @@ func (g *customMetricsRegistry) Gather() ([]*io_prometheus_client.MetricFamily, 
 }
 
 func prometheusPusher(url, job string, statusChan <-chan Status, wg *sync.WaitGroup) {
+	// Gauges are created per pusher (rather than as package globals) so that
+	// multiple schedulers in the same process do not share and clobber the same
+	// metric values.
+	numTotal := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "num_total",
+		Help: "Total number of tasks",
+	})
+	numFailed := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "num_failed",
+		Help: "Total number of failed tasks",
+	})
+	numSucceed := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "num_succeed",
+		Help: "Total number of succeeded tasks",
+	})
+	numFinished := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "num_finished",
+		Help: "Total number of finished tasks",
+	})
+
+	r := runner.Get()
 	instance := fmt.Sprintf(
 		"gojob-%s-%s-%s-%s",
 		version.Version,
-		utils.Sanitize(runner.Runner.Country),
-		utils.Sanitize(runner.Runner.City),
-		runner.Runner.IP,
+		utils.Sanitize(r.Country),
+		utils.Sanitize(r.City),
+		r.IP,
 	)
 	registry := NewRegistryWithLabels(map[string]string{
 		"gojob_version":        version.Version,
-		"gojob_runner_ip":      runner.Runner.IP,
-		"gojob_runner_country": runner.Runner.Country,
-		"gojob_runner_region":  runner.Runner.Region,
-		"gojob_runner_city":    runner.Runner.City,
+		"gojob_runner_ip":      r.IP,
+		"gojob_runner_country": r.Country,
+		"gojob_runner_region":  r.Region,
+		"gojob_runner_city":    r.City,
 	})
 	registry.MustRegister(numTotal, numFailed, numSucceed, numFinished)
 	registry.MustRegister(
@@ -93,8 +90,9 @@ func prometheusPusher(url, job string, statusChan <-chan Status, wg *sync.WaitGr
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
 	go func() {
+		defer wg.Done()
 		for status := range statusChan {
-			slog.Info("promehteus pusher", slog.Any("status", status))
+			slog.Info("prometheus pusher", slog.Any("status", status))
 			numTotal.Set(float64(status.NumTotal))
 			numFailed.Set(float64(status.NumFailed))
 			numSucceed.Set(float64(status.NumSucceed))
@@ -105,6 +103,5 @@ func prometheusPusher(url, job string, statusChan <-chan Status, wg *sync.WaitGr
 				slog.Error("error occurred while pushing to prometheus", slog.String("error", err.Error()))
 			}
 		}
-		wg.Done()
 	}()
 }

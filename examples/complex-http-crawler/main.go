@@ -32,23 +32,27 @@ func init() {
 }
 
 func main() {
-	total := utils.Count(utils.Cat(opts.InputFilePath))
+	// Read the input once into memory so we know the total up front without
+	// scanning the (possibly remote) input file twice.
+	var lines []string
+	for line := range utils.Cat(opts.InputFilePath) {
+		lines = append(lines, line)
+	}
 	scheduler := gojob.New(
 		gojob.WithNumWorkers(opts.NumWorkers),
 		gojob.WithMaxRetries(opts.MaxRetries),
 		gojob.WithMaxRuntimePerTaskSeconds(opts.MaxRuntimePerTaskSeconds),
 		gojob.WithNumShards(int64(opts.NumShards)),
 		gojob.WithShard(int64(opts.Shard)),
+		gojob.WithTotalTasks(int64(len(lines))),
 		gojob.WithResultFilePath(opts.OutputFilePath),
-		gojob.WithTotalTasks(total),
 		gojob.WithStatusFilePath("status.json"),
-		gojob.WithResultFilePath("result.json"),
 		gojob.WithMetadataFilePath("metadata.json"),
 		gojob.WithPrometheusPushGateway("http://localhost:9091", "gojob"),
 	).
 		Start()
-	for line := range utils.Cat(opts.InputFilePath) {
-		scheduler.Submit(model.New(string(line)))
+	for _, line := range lines {
+		scheduler.Submit(model.New(line))
 	}
 	scheduler.Wait()
 }

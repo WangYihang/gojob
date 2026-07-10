@@ -6,20 +6,30 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 )
 
-var Runner *IPInfo
-var once sync.Once
+var (
+	runner *IPInfo
+	once   sync.Once
+)
 
-func init() {
+// Get returns information about the current runner (its public IP, geo
+// location, etc.).
+//
+// The information is fetched lazily from ipinfo.io on the first call and cached
+// for subsequent calls. Fetching only happens when Get is invoked (for example
+// when the Prometheus push gateway is enabled), so simply importing this
+// package no longer triggers any network request. If the lookup fails, an
+// IPInfo populated with "unknown" placeholder values is returned.
+func Get() *IPInfo {
 	once.Do(func() {
-		Runner = NewIPInfo()
-		err := Runner.Get()
-		if err != nil {
-			slog.Error("error occurred while getting runner ip info", slog.String("error", err.Error()))
-			return
+		runner = NewIPInfo()
+		if err := runner.Get(); err != nil {
+			slog.Warn("error occurred while getting runner ip info", slog.String("error", err.Error()))
 		}
 	})
+	return runner
 }
 
 type IPInfo struct {
@@ -49,18 +59,15 @@ func NewIPInfo() *IPInfo {
 }
 
 func (i *IPInfo) Get() error {
-	req, err := http.Get("https://ipinfo.io/")
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get("https://ipinfo.io/")
 	if err != nil {
 		return err
 	}
-	defer req.Body.Close()
-	body, err := io.ReadAll(req.Body)
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
-	err = json.Unmarshal(body, i)
-	if err != nil {
-		return err
-	}
-	return nil
+	return json.Unmarshal(body, i)
 }

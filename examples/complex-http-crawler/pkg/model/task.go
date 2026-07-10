@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"net/http"
 	"time"
 )
@@ -18,7 +19,7 @@ func New(url string) *MyTask {
 	}
 }
 
-func (t *MyTask) Do() error {
+func (t *MyTask) Do(ctx context.Context) error {
 	transport := &http.Transport{
 		DisableCompression: true,
 	}
@@ -29,7 +30,7 @@ func (t *MyTask) Do() error {
 		},
 		Timeout: 4 * time.Second,
 	}
-	req, err := http.NewRequest(http.MethodHead, t.Url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, t.Url, nil)
 	if err != nil {
 		return err
 	}

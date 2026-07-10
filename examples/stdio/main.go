@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/WangYihang/gojob"
@@ -17,7 +18,7 @@ func New(line string) *MyPrinterTask {
 	}
 }
 
-func (t *MyPrinterTask) Do() error {
+func (t *MyPrinterTask) Do(ctx context.Context) error {
 	fmt.Println(t.line)
 	return nil
 }

@@ -1,6 +1,10 @@
 package main
 
-import "net"
+import (
+	"context"
+	"net"
+	"strconv"
+)
 
 type MyTask struct {
 	IP     string `json:"ip"`
@@ -16,11 +20,10 @@ func New(ip string, port uint16) *MyTask {
 	}
 }
 
-func (t *MyTask) Do() error {
-	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
-		IP:   net.ParseIP(t.IP),
-		Port: int(t.Port),
-	})
+func (t *MyTask) Do(ctx context.Context) error {
+	var dialer net.Dialer
+	address := net.JoinHostPort(t.IP, strconv.Itoa(int(t.Port)))
+	conn, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {
 		t.Status = Closed
 		return nil

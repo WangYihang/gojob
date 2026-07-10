@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"math/rand"
 	"time"
 
@@ -19,9 +20,13 @@ func New(index int, sleepSeconds int) *MyTask {
 	}
 }
 
-func (t *MyTask) Do() error {
-	time.Sleep(time.Duration(t.SleepSeconds) * time.Second)
-	return nil
+func (t *MyTask) Do(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(time.Duration(t.SleepSeconds) * time.Second):
+		return nil
+	}
 }
 
 func main() {

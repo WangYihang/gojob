@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"math/rand"
 	"time"
 
@@ -15,9 +16,13 @@ func New() *MyTask {
 	return &MyTask{}
 }
 
-func (t *MyTask) Do() error {
-	time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
-	return nil
+func (t *MyTask) Do(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(time.Duration(rand.Intn(100)) * time.Millisecond):
+		return nil
+	}
 }
 
 func main() {
@@ -34,7 +39,7 @@ func main() {
 		gojob.WithTotalTasks(total),
 		gojob.WithMetadata("a", "b"),
 		gojob.WithMetadata("c", "d"),
-		gojob.WithMetadata("runner", runner.Runner),
+		gojob.WithMetadata("runner", runner.Get()),
 	).
 		Start()
 	for range utils.Cat(inputFilePath) {

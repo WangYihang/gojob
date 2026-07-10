@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -20,13 +21,17 @@ func New(url string) *MyTask {
 	}
 }
 
-func (t *MyTask) Do() error {
-	response, err := http.Get(t.Url)
+func (t *MyTask) Do(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, t.Url, nil)
 	if err != nil {
 		return err
 	}
-	t.StatusCode = response.StatusCode
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
 	defer response.Body.Close()
+	t.StatusCode = response.StatusCode
 	return nil
 }
 
@@ -43,8 +48,11 @@ func main() {
 		gojob.WithResultFilePath("result.json"),
 		gojob.WithMetadataFilePath("metadata.json"),
 	)
+	// Register the result consumer before the scheduler starts so that no
+	// results are missed.
+	resultChan := scheduler.ResultChan()
 	go func() {
-		for result := range scheduler.ResultChan() {
+		for result := range resultChan {
 			data, err := json.Marshal(result)
 			if err != nil {
 				slog.Error("failed to marshal result", slog.String("error", err.Error()))
