@@ -100,11 +100,14 @@ redeliveries are silent, so `stats.Done` counts jobs, not attempts.
 | --- | --- | --- | --- |
 | in-memory | `queue/memq` | none | tests / single-process batch |
 | file directory | `queue/fileq` | none (stdlib) | single-machine durable + crash-resume |
-| Redis | `queue/redisq` | go-redis | cross-machine distribution *(phase 2)* |
+| Redis | `queue/redisq` | go-redis | cross-machine distribution |
 
-Core `queue`, `memq`, and `fileq` are **stdlib-only**; `redisq` goes in its own
-module so the Redis dependency never reaches the core — the same isolation used
-for `prom` and `web`.
+Core `queue`, `memq`, and `fileq` are **stdlib-only**. `redisq` adds the go-redis
+dependency, but — like `prom` — importing the core never compiles it; only
+importing `queue/redisq` does. (go-redis is lean, so it lives in the main module
+rather than a separate one.) `redisq` uses atomic Lua scripts for claim, reclaim,
+and the drain check so that concurrent consumers never lose or double-count a
+message.
 
 ### `fileq` on disk
 
@@ -133,7 +136,8 @@ for `prom` and `web`.
 
 ## Phasing
 
-1. **MVP** — `queue` (interface, `Consume`, `Codec`, `Fill`) + `memq` + `fileq` +
-   `examples/queue` + tests (all stdlib).
-2. **Distribution** — `queue/redisq` (separate module) + integration tests.
+1. **MVP** *(done)* — `queue` (interface, `Consume`, `Codec`, `Fill`) + `memq` +
+   `fileq` + `examples/queue` + tests (all stdlib).
+2. **Distribution** *(done)* — `queue/redisq` + integration tests against a real
+   redis-server.
 3. **Optional** — delayed redelivery, priority, batch ack.

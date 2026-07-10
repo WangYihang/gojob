@@ -231,7 +231,9 @@ func (q *Queue[T]) divert(procName, seq string, deliveries int) {
 }
 
 func (q *Queue[T]) drained() bool {
-	return q.sealed() && q.count(pendingDir) == 0 && q.count(processingDir) == 0
+	// Check processing before pending: a nack renames an entry processing->pending
+	// atomically, so this order never observes a message as absent from both.
+	return q.sealed() && q.count(processingDir) == 0 && q.count(pendingDir) == 0
 }
 
 func (q *Queue[T]) sealed() bool {

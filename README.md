@@ -184,9 +184,10 @@ results, stats := gojob.WithStats(ctx, results)
 gojob.WriteJSONL(ctx, out, results)
 ```
 
-Backends: `queue/memq` (in-memory, stdlib) and `queue/fileq` (durable, stdlib,
-resumes un-acknowledged work after a crash). Design notes and the planned Redis
-backend are in [docs/design/queue.md](./docs/design/queue.md).
+Backends: `queue/memq` (in-memory, stdlib), `queue/fileq` (durable, stdlib,
+resumes un-acknowledged work after a crash), and `queue/redisq` (Redis, for
+cross-machine distribution). Design notes are in
+[docs/design/queue.md](./docs/design/queue.md).
 
 ## Examples
 
