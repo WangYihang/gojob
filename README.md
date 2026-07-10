@@ -172,6 +172,40 @@ func main() {
 }
 ```
 
+## Experimental: composable pipeline API
+
+The [`pipeline`](./pipeline/) package is a generics-based redesign that models a
+job as a composition of small, cancellable stages — a source, a concurrent
+`Process` stage with retries and per-attempt timeouts, combinators such as
+`Shard` and `WithStats`, and sinks like `WriteJSONL` — all driven by a single
+`context.Context`. There is no `Start`/`Submit`/`Wait` lifecycle and no shared
+mutable state; "done" is just a closed channel.
+
+```go
+ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+defer cancel()
+
+urls := pipeline.Lines(ctx, "input.txt") // <-chan string
+urls = pipeline.Shard(ctx, urls, 4, 0)   // keep this shard's slice
+
+results := pipeline.Process(ctx, urls, crawl,
+	pipeline.Workers(32),
+	pipeline.Retry(4, pipeline.ExpBackoff(100*time.Millisecond, 10*time.Second)),
+	pipeline.Timeout(16*time.Second),
+)
+
+results, stats := pipeline.WithStats(ctx, results)
+go pipeline.ReportEvery(stats, 5*time.Second, os.Stderr) // progress, decoupled
+
+if err := pipeline.WriteJSONL(ctx, out, results); err != nil {
+	log.Fatal(err)
+}
+```
+
+Here `crawl` is an ordinary `func(context.Context, string) (CrawlResult, error)` —
+no interface to implement. See [examples/pipeline-crawler](./examples/pipeline-crawler/)
+for a complete program.
+
 ## Coverage
 
 [![codecov-graph](https://codecov.io/gh/WangYihang/gojob/graphs/tree.svg?token=FG1HT7FCKG)](https://codecov.io/gh/WangYihang/gojob)
