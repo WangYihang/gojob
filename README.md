@@ -151,6 +151,20 @@ go prom.Push(ctx, stats, "http://localhost:9091", "gojob") // gojob_num_total, _
 A `docker-compose.yaml` with Prometheus, a Pushgateway, and Grafana is included
 for local experimentation.
 
+## Web dashboard
+
+Also a `Stats` consumer: `gojob/web` serves a small, self-contained live
+dashboard (Server-Sent Events + one theme-adaptive HTML page, no external
+assets). Point a browser at it to watch progress in real time:
+
+```go
+results, stats := gojob.WithStats(ctx, results)
+go web.Serve(ctx, stats, ":8080", web.WithTitle("my job"))
+```
+
+Mount it on your own router with `web.Handler(ctx, stats)` instead. See
+[examples/dashboard](./examples/dashboard/).
+
 ## Examples
 
 | Example | Shows |
@@ -159,6 +173,7 @@ for local experimentation.
 | [`examples/stdio`](./examples/stdio/) | The smallest possible pipeline (stdin → transform → stdout). |
 | [`examples/tasks`](./examples/tasks/) | The `Execute` + `Task[T]` object style. |
 | [`examples/prometheus`](./examples/prometheus/) | Progress pushed via `gojob/prom`. |
+| [`examples/dashboard`](./examples/dashboard/) | Live web dashboard via `gojob/web`. |
 
 ```bash
 go run ./examples/crawler -i urls.txt -o results.jsonl -n 32 -r 4 -t 16
