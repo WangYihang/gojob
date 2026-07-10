@@ -29,13 +29,19 @@ jobs:
     - name: Vet
       run: go vet ./...
 
-    - name: Test
-      run: go test -v ./...
+    - name: Unit tests
+      run: go test -race ./...
 
-    - name: Run coverage
-      run: go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+    - name: Integration tests
+      run: go test -race -tags=integration ./...
 
-    - 
+    - name: End-to-end tests
+      run: go test -tags=e2e ./...
+
+    - name: Coverage
+      run: go test -tags=integration -race -coverprofile=coverage.txt -covermode=atomic $(go list ./... | grep -v /examples/)
+
+    -
       name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4.0.1
       with:

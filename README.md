@@ -5,7 +5,16 @@
 [![codecov](https://codecov.io/gh/WangYihang/gojob/graph/badge.svg?token=FG1HT7FCKG)](https://codecov.io/gh/WangYihang/gojob)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FWangYihang%2Fgojob.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FWangYihang%2Fgojob?ref=badge_shield)
 
-gojob is a simple job scheduler.
+gojob runs a large batch of jobs concurrently — with retries, per-attempt
+timeouts, sharding, live progress, and pluggable inputs/outputs — modeled as a
+small, composable, cancellable **pipeline**.
+
+A job is a composition of stages connected by channels: a **source** produces
+items, **`Process`** maps them concurrently, **combinators** like `Shard` and
+`WithStats` transform or observe the stream, and a **sink** such as `WriteJSONL`
+drives it to completion. Everything is governed by a single `context.Context`;
+"done" is just a closed channel — there is no `Start`/`Submit`/`Wait` lifecycle
+and no shared mutable state to race on.
 
 ## Install
 
@@ -13,203 +22,158 @@ gojob is a simple job scheduler.
 go get github.com/WangYihang/gojob
 ```
 
-## Usage
+## Quick start
 
-Create a job scheduler with a worker pool of size 32. To do this, you need to implement the `Task` interface.
-
-```go
-// Task is an interface that defines a task
-type Task interface {
-	// Do starts the task, returns error if failed.
-	// If an error is returned, the task will be retried until MaxRetries is reached.
-	// You can set MaxRetries by calling WithMaxRetries on the scheduler.
-	//
-	// The context is cancelled when the task exceeds its configured max runtime,
-	// so honor it (e.g. http.NewRequestWithContext) to support cancellation.
-	Do(ctx context.Context) error
-}
-```
-
-The whole [code](./examples/simple-http-crawler/main.go) looks like this (try it [online](https://go.dev/play/p/UiYextGte4v)).
+Crawl a list of URLs concurrently and write one JSON result per line. The unit
+of work is an ordinary function — no interface to implement:
 
 ```go
 package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
+	"time"
 
 	"github.com/WangYihang/gojob"
 )
 
-type MyTask struct {
-	Url        string `json:"url"`
+type CrawlResult struct {
+	URL        string `json:"url"`
 	StatusCode int    `json:"status_code"`
 }
 
-func New(url string) *MyTask {
-	return &MyTask{
-		Url: url,
-	}
-}
-
-func (t *MyTask) Do(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, t.Url, nil)
+func crawl(ctx context.Context, url string) (CrawlResult, error) {
+	result := CrawlResult{URL: url}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return err
+		return result, err
 	}
-	response, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return result, err
 	}
-	defer response.Body.Close()
-	t.StatusCode = response.StatusCode
-	return nil
+	defer resp.Body.Close()
+	result.StatusCode = resp.StatusCode
+	return result, nil
 }
 
 func main() {
-	var numTotalTasks int64 = 256
-	scheduler := gojob.New(
-		gojob.WithNumWorkers(8),
-		gojob.WithMaxRetries(4),
-		gojob.WithMaxRuntimePerTaskSeconds(16),
-		gojob.WithNumShards(4),
-		gojob.WithShard(0),
-		gojob.WithTotalTasks(numTotalTasks),
-		gojob.WithStatusFilePath("status.json"),
-		gojob.WithResultFilePath("result.json"),
-		gojob.WithMetadataFilePath("metadata.json"),
-	).
-		Start()
-	for i := range numTotalTasks {
-		scheduler.Submit(New(fmt.Sprintf("https://httpbin.org/task/%d", i)))
-	}
-	scheduler.Wait()
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	urls := gojob.Lines(ctx, "urls.txt") // <-chan string ("-" = stdin; gzip/S3 via uio)
+	urls = gojob.Shard(ctx, urls, 1, 0)  // 1 shard = everything
+
+	results := gojob.Process(ctx, urls, crawl,
+		gojob.WithWorkers(32),
+		gojob.WithRetry(4, gojob.ExpBackoff(100*time.Millisecond, 10*time.Second)),
+		gojob.WithTimeout(16*time.Second),
+	)
+
+	results, stats := gojob.WithStats(ctx, results)
+	go gojob.ReportEvery(stats, 5*time.Second, os.Stderr) // live progress, decoupled
+
+	_ = gojob.WriteJSONL(ctx, os.Stdout, results)
 }
 ```
 
-## Use Case
-
-### http-crawler
-
-Let's say you have a bunch of URLs that you want to crawl and save the HTTP response to a file. You can use gojob to do that.
-Check [it](./examples/complex-http-crawler/) out for details.
-
-Try it out using the following command.
-
-```bash
-$ go run github.com/WangYihang/gojob/examples/complex-http-crawler@latest --help
-Usage:
-  main [OPTIONS]
-
-Application Options:
-  -i, --input=                        input file path
-  -o, --output=                       output file path
-  -r, --max-retries=                  max retries (default: 3)
-  -t, --max-runtime-per-task-seconds= max runtime per task seconds (default: 60)
-  -n, --num-workers=                  number of workers (default: 32)
-
-Help Options:
-  -h, --help                          Show this help message
-```
-
-```bash
-$ cat urls.txt
-https://www.google.com/
-https://www.facebook.com/
-https://www.youtube.com/
-```
-
-```
-$ go run github.com/WangYihang/gojob/examples/complex-http-crawler@latest -i input.txt -o output.txt -n 4
-```
+Each output line is a `Result` envelope:
 
 ```json
-$ tail -n 1 output.txt
-{
-    "started_at": 1708934911909748,
-    "finished_at": 1708934913160935,
-    "num_tries": 1,
-    "task": {
-        "url": "https://www.google.com/",
-        "http": {
-            "request": {
-                "method": "HEAD",
-                "url": "https://www.google.com/",
-                "host": "www.google.com",
-            	// details omitted for simplicity
-            },
-            "response": {
-                "status": "200 OK",
-                "proto": "HTTP/2.0",
-                "header": {
-                    "Alt-Svc": [
-                        "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
-                    ],
-                },
-            	// details omitted for simplicity
-                "body": "",
-            }
-        }
-    },
-    "error": ""
-}
+{"value":{"url":"https://example.com/","status_code":200},"error":"","attempts":1,"started_at":1708934911909748,"duration_ms":42}
 ```
 
-## Integration with Prometheus
+## Concepts
 
-gojob provides metrics (`num_total`, `num_failed`, `num_succeed`, `num_finished`) for Prometheus. You can use the following code to expose the metrics.
+| Stage | What it does |
+| --- | --- |
+| `Lines(ctx, path)` / `From(ctx, items...)` | **Sources** — stream items from a file/stdin/gzip/S3 (via [uio](https://github.com/WangYihang/uio)) or from memory. |
+| `Process(ctx, in, fn, opts...)` | The **engine** — runs `fn` over the stream with a bounded worker pool, returning `<-chan Result[Out]` in completion order. |
+| `Shard(ctx, in, n, i)` | Keep only this shard's slice of the stream (item `k` → shard `k % n`). |
+| `WithStats(ctx, in)` → `stats` | Tap the stream to count progress **without altering it**. |
+| `ReportEvery` / `Stats.Stream` / `Stats.Snapshot` | Observe progress (stderr line, snapshot channel, one-off snapshot). |
+| `WriteJSONL(ctx, w, in)` / `Tee` / `Drain` | **Sinks** — write JSON Lines to any `io.Writer`, fan a stream out, or discard it. |
 
-```go
-package main
+### Retries and timeouts
 
-func main() {
-	scheduler := gojob.New(
-		// All you need to do is just adding the following option to the scheduler constructor
-		gojob.WithPrometheusPushGateway("http://localhost:9091", "gojob"),
-	).Start()
-}
-```
-
-## Experimental: composable pipeline API
-
-The [`pipeline`](./pipeline/) package is a generics-based redesign that models a
-job as a composition of small, cancellable stages — a source, a concurrent
-`Process` stage with retries and per-attempt timeouts, combinators such as
-`Shard` and `WithStats`, and sinks like `WriteJSONL` — all driven by a single
-`context.Context`. There is no `Start`/`Submit`/`Wait` lifecycle and no shared
-mutable state; "done" is just a closed channel.
+`WithRetry` and `WithTimeout` are `Process` options. `WithRetry(n, backoff)` attempts each
+item up to `n` times; `WithTimeout(d)` bounds a single attempt (its context is
+cancelled when it elapses, so context-aware work aborts instead of leaking).
+`Result` carries `Attempts`, `StartedAt`, and `Duration`.
 
 ```go
-ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-defer cancel()
-
-urls := pipeline.Lines(ctx, "input.txt") // <-chan string
-urls = pipeline.Shard(ctx, urls, 4, 0)   // keep this shard's slice
-
-results := pipeline.Process(ctx, urls, crawl,
-	pipeline.Workers(32),
-	pipeline.Retry(4, pipeline.ExpBackoff(100*time.Millisecond, 10*time.Second)),
-	pipeline.Timeout(16*time.Second),
+results := gojob.Process(ctx, in, fn,
+	gojob.WithWorkers(64),
+	gojob.WithRetry(5, gojob.ExpBackoff(100*time.Millisecond, 10*time.Second)),
+	gojob.WithTimeout(30*time.Second),
 )
-
-results, stats := pipeline.WithStats(ctx, results)
-go pipeline.ReportEvery(stats, 5*time.Second, os.Stderr) // progress, decoupled
-
-if err := pipeline.WriteJSONL(ctx, out, results); err != nil {
-	log.Fatal(err)
-}
 ```
 
-Here `crawl` is an ordinary `func(context.Context, string) (CrawlResult, error)` —
-no interface to implement. See [examples/pipeline-crawler](./examples/pipeline-crawler/)
-for a complete program.
+### Sharding across machines
 
-## Coverage
+Run the same program on N machines, each with a different shard index, to split
+the work deterministically:
 
-[![codecov-graph](https://codecov.io/gh/WangYihang/gojob/graphs/tree.svg?token=FG1HT7FCKG)](https://codecov.io/gh/WangYihang/gojob)
+```go
+in = gojob.Shard(ctx, in, numShards, shard) // e.g. Shard(ctx, in, 4, 2)
+```
 
+### Self-contained tasks
+
+Prefer "one task object per item"? Implement `Task[T]` and use `Execute`, which
+is a thin adapter over `Process`:
+
+```go
+type PingTask struct {
+	Host    string `json:"host"`
+	Latency int64  `json:"latency_ms"`
+}
+
+func (t *PingTask) Execute(ctx context.Context) (*PingTask, error) { /* ... */ return t, nil }
+
+results := gojob.Execute(ctx, tasks, gojob.WithWorkers(8)) // tasks is <-chan gojob.Task[*PingTask]
+```
+
+## Prometheus
+
+Observability is just a `Stats` consumer, so it lives in a separate package and
+the core library stays dependency-light. Import `gojob/prom` to push progress to
+a Pushgateway:
+
+```go
+results, stats := gojob.WithStats(ctx, results)
+go prom.Push(ctx, stats, "http://localhost:9091", "gojob") // gojob_num_total, _done, _succeeded, _failed
+```
+
+A `docker-compose.yaml` with Prometheus, a Pushgateway, and Grafana is included
+for local experimentation.
+
+## Examples
+
+| Example | Shows |
+| --- | --- |
+| [`examples/crawler`](./examples/crawler/) | Full CLI: file/stdin/S3 in, JSONL out, retries, timeouts, sharding, progress. |
+| [`examples/stdio`](./examples/stdio/) | The smallest possible pipeline (stdin → transform → stdout). |
+| [`examples/tasks`](./examples/tasks/) | The `Execute` + `Task[T]` object style. |
+| [`examples/prometheus`](./examples/prometheus/) | Progress pushed via `gojob/prom`. |
+
+```bash
+go run ./examples/crawler -i urls.txt -o results.jsonl -n 32 -r 4 -t 16
+```
+
+## Testing
+
+Tests are layered; use the `Makefile`:
+
+```bash
+make test              # unit tests (race detector)
+make test-integration  # + integration tests against a local HTTP server
+make test-e2e          # build the example binary and drive it end-to-end
+make cover             # coverage profile (unit + integration)
+```
 
 ## License
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FWangYihang%2Fgojob.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FWangYihang%2Fgojob?ref=badge_large)

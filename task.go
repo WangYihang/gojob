@@ -2,41 +2,52 @@ package gojob
 
 import (
 	"context"
-
-	"github.com/google/uuid"
+	"encoding/json"
+	"time"
 )
 
-// Task is an interface that defines a task
-type Task interface {
-	// Do starts the task, returns error if failed.
-	// If an error is returned, the task will be retried until MaxRetries is reached.
-	// You can set MaxRetries by calling WithMaxRetries on the scheduler.
-	//
-	// The provided context is cancelled when the task exceeds the configured
-	// max runtime (see WithMaxRuntimePerTaskSeconds). Long-running or blocking
-	// operations should honor ctx (e.g. http.NewRequestWithContext) so that
-	// they can be cancelled instead of leaking until completion.
-	Do(ctx context.Context) error
+// Task is a self-contained unit of work that produces a typed result.
+// Use it with Execute when you prefer "one task object per item" over a plain
+// mapping function.
+type Task[T any] interface {
+	Execute(ctx context.Context) (T, error)
 }
 
-type basicTask struct {
-	Index      int64  `json:"index"`
-	ID         string `json:"id"`
-	StartedAt  int64  `json:"started_at"`
-	FinishedAt int64  `json:"finished_at"`
-	NumTries   int    `json:"num_tries"`
-	Task       Task   `json:"task"`
-	Error      string `json:"error"`
+// TaskFunc adapts a plain function to a Task.
+type TaskFunc[T any] func(ctx context.Context) (T, error)
+
+// Execute implements Task.
+func (f TaskFunc[T]) Execute(ctx context.Context) (T, error) { return f(ctx) }
+
+// Result is the outcome of processing a single item, carrying the produced
+// value alongside its error and execution metadata.
+type Result[T any] struct {
+	Value     T
+	Err       error
+	Attempts  int
+	StartedAt time.Time
+	Duration  time.Duration
 }
 
-func newBasicTask(index int64, task Task) *basicTask {
-	return &basicTask{
-		Index:      index,
-		ID:         uuid.New().String(),
-		StartedAt:  0,
-		FinishedAt: 0,
-		NumTries:   0,
-		Task:       task,
-		Error:      "",
+// MarshalJSON renders a Result as a flat, log-friendly JSON object. The error
+// is emitted as a string ("" when there was none), so results serialize cleanly
+// to JSON Lines.
+func (r Result[T]) MarshalJSON() ([]byte, error) {
+	var errStr string
+	if r.Err != nil {
+		errStr = r.Err.Error()
 	}
+	return json.Marshal(struct {
+		Value      T      `json:"value"`
+		Error      string `json:"error"`
+		Attempts   int    `json:"attempts"`
+		StartedAt  int64  `json:"started_at"`
+		DurationMs int64  `json:"duration_ms"`
+	}{
+		Value:      r.Value,
+		Error:      errStr,
+		Attempts:   r.Attempts,
+		StartedAt:  r.StartedAt.UnixMicro(),
+		DurationMs: r.Duration.Milliseconds(),
+	})
 }

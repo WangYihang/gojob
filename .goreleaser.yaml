@@ -16,8 +16,8 @@ before:
     - go generate ./...
 
 builds:
-  - id: complex-http-crawler
-    main: examples/complex-http-crawler/main.go
+  - id: crawler
+    main: ./examples/crawler
     env:
       - CGO_ENABLED=0
     goos:
@@ -65,7 +65,7 @@ upx:
     enabled: true
 
     # Filter by build ID.
-    ids: [ "complex-http-crawler"]
+    ids: [ "crawler" ]
 
     # Compress argument.
     # Valid options are from '1' (faster) to '9' (better), and 'best'.

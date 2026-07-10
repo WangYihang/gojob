@@ -1,39 +1,20 @@
+// Command stdio is the smallest possible gojob pipeline: read lines from stdin,
+// upper-case each concurrently, and write one JSON result per line to stdout.
 package main
 
 import (
 	"context"
-	"fmt"
+	"os"
+	"strings"
 
 	"github.com/WangYihang/gojob"
-	"github.com/WangYihang/gojob/pkg/utils"
 )
 
-type MyPrinterTask struct {
-	line string
-}
-
-func New(line string) *MyPrinterTask {
-	return &MyPrinterTask{
-		line: line,
-	}
-}
-
-func (t *MyPrinterTask) Do(ctx context.Context) error {
-	fmt.Println(t.line)
-	return nil
-}
-
 func main() {
-	scheduler := gojob.New(
-		gojob.WithNumWorkers(8),
-		gojob.WithMaxRetries(4),
-		gojob.WithMaxRuntimePerTaskSeconds(16),
-		gojob.WithResultFilePath("-"),
-		gojob.WithStatusFilePath("status.json"),
-	).
-		Start()
-	for line := range utils.Cat("-") {
-		scheduler.Submit(New(line))
-	}
-	scheduler.Wait()
+	ctx := context.Background()
+	lines := gojob.Lines(ctx, "-")
+	results := gojob.Process(ctx, lines, func(ctx context.Context, line string) (string, error) {
+		return strings.ToUpper(line), nil
+	}, gojob.WithWorkers(4))
+	_ = gojob.WriteJSONL(ctx, os.Stdout, results)
 }
