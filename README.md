@@ -165,6 +165,29 @@ go web.Serve(ctx, stats, ":8080", web.WithTitle("my job"))
 Mount it on your own router with `web.Handler(ctx, stats)` instead. See
 [examples/dashboard](./examples/dashboard/).
 
+## Durable queue
+
+For jobs that must **survive crashes** or be **shared across processes**, pull
+work from a durable queue instead of an in-memory source. `queue.Consume`
+returns the same `Result` stream as `Process`, so the rest of the pipeline is
+unchanged; delivery is at-least-once (make `fn` idempotent).
+
+```go
+q, _ := fileq.Open[Job]("jobs.q")           // file-backed, crash-resumable
+results, _ := queue.Consume(ctx, q, handle,
+    queue.WithWorkers(32),
+    queue.WithRetry(4, gojob.ExpBackoff(100*time.Millisecond, 10*time.Second)),
+    queue.WithTimeout(16*time.Second),
+    queue.WithMaxDeliveries(5),             // dead-letter after 5 tries
+)
+results, stats := gojob.WithStats(ctx, results)
+gojob.WriteJSONL(ctx, out, results)
+```
+
+Backends: `queue/memq` (in-memory, stdlib) and `queue/fileq` (durable, stdlib,
+resumes un-acknowledged work after a crash). Design notes and the planned Redis
+backend are in [docs/design/queue.md](./docs/design/queue.md).
+
 ## Examples
 
 | Example | Shows |
@@ -174,6 +197,7 @@ Mount it on your own router with `web.Handler(ctx, stats)` instead. See
 | [`examples/tasks`](./examples/tasks/) | The `Execute` + `Task[T]` object style. |
 | [`examples/prometheus`](./examples/prometheus/) | Progress pushed via `gojob/prom`. |
 | [`examples/dashboard`](./examples/dashboard/) | Live web dashboard via `gojob/web`. |
+| [`examples/queue`](./examples/queue/) | Durable, crash-resumable jobs via `gojob/queue`. |
 
 ```bash
 go run ./examples/crawler -i urls.txt -o results.jsonl -n 32 -r 4 -t 16
